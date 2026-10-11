@@ -1,3 +1,23 @@
+# dbt
+target/
+dbt_packages/
+logs/
+.user.yml
+
+# credentials: never commit these
+# (may add a CI profiles.yml that reads env vars only)
+profiles.yml
+*.json
+!package*.json
+.env
+.venv/
+
+# OS / editor
+.DS_Store
+.vscode/
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
