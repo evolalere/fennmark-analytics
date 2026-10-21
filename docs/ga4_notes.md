@@ -113,7 +113,19 @@
 - GA4 revenue is treated as indicative only; the reconciliation model quantifies the duplicates, unidentified purchases and untracked orders.
 
 ## Open questions for week 3
-
+1. Customers: how does the generator assign customer_id to user_pseudo_id, given user_id is never populated? One customer per pseudo-id, or merge some pseudo-ids into one customer to simulate multi-device users (~1.6% of users already span device types)?
+2. Orders: which purchases become backend orders — only the ~4,460 with a real transaction_id, or also some of the 883 "(not set)" ones (with no GA4 link)?
+3. Orders GA4 never saw: what share (phone, app, ad-blocked) and how are they marked?
+4. Order id before mid-November: GA4 ids only start part-way through the month; does the backend have orders before that date, and if so how are they keyed?
+5. Revenue: backend price = GA4 item price, or generated independently so the two never fully reconcile? Which currency, and do a few orders get a deliberate mismatch?
+6. Products: canonical category per product derived from the most common breadcrumb path, or hand-assigned from the 22 purchase categories? What goes in cost price?
+7. Order lifecycle: which statuses, in what order, with what typical delays (paid -> shipped -> delivered), and what share cancel, return or refund?
+8. Returns and refunds: separate tables or status events? Partial refunds allowed?
+9. NPS: who gets surveyed (all delivered orders? a sample?), response rate, score distribution, and does the score correlate with returns or delivery delay?
+10. Marketing spend: daily by source/medium matching GA4 traffic_source values; which channels get spend and which are organic?
+11. A/B test: which promotion, how is assignment tied to view_promotion/select_promotion, what split, and what effect size is baked in?
+12. Deliberate mess: final list of injected problems and where each one lands (duplicate customers, late status events, mixed timestamp formats, NULL consent, currency mismatch, mid-history column rename).
+13. First-touch: Week 7 derives first-seen from MIN(event_timestamp); does the backend customer table carry its own acquisition date that may disagree?
 
 ## Saved Queries
 - See ga4_queries.sql
