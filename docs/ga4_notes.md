@@ -32,6 +32,7 @@
 - Weekly seasonality (Peak days - Mid week from Tuesdays to Thursdays) During the weeks leading up to Christmas - Thanksgiving, Cyber week - Tuesdays to Fridays tend to be busy.
 ### Event mix
 - page_view, user_engagement, scroll, view_item, session_start, first_visit, view_promotion, add_to_cart, begin_checkout, select_item, view_search_results, add_shipping_info, add_payment_info, select_promotion, purchase, click, view_item_list
+![Events per day, Nov 2020 - Jan 2021](img/ga4_events_per_day.png)
 ### Users 
 - user_id almost always NULL -> stitching plan
 ### event_params keys we keep and their value column
