@@ -27,7 +27,7 @@
 - Mode Column (console’s Schema tab for events_*) -> REPEATED = array (whatever the type).
 
 ## Findings (q2 to q7)
-### Daily volume and seasonality; 
+### Daily volume and seasonality
 - weak days
 - Weekly seasonality (Peak days - Mid week from Tuesdays to Thursdays) During the weeks leading up to Christmas - Thanksgiving, Cyber week - Tuesdays to Fridays tend to be busy.
 ### Event mix
@@ -108,12 +108,9 @@
 - stg_ga4__purchases: coalesce the two id sources, drop (not set)/NULL into a flagged “unidentified purchase” bucket, deduplicate real ids to first event. (See known data problems above and saved queries below for purchases.)
 - Generator seeds orders from the ~4,460 real ids. The 883 unidentified purchases are the realistic “GA4 saw a purchase but can’t tell us which order” category in Week 7’s reconciliation; no need to invent a further 5% of failed payments on top, the data already provides it.
 - The backend orders table, not GA4, is the source of truth for revenue
-    GA4 revenue is whatever the customer’s browser reported at the moment of checkout, and that number is unreliable due to the known data problems above under purchase: 
-        Duplicate purchase events double-count (November especially)
-        15.5% of purchases have no id to attribute it to, ad blockers and closed tabs mean some orders never fire the event at all, and 
-        Nothing that happens afterwards — cancellations, returns, refunds, failed payments — ever reaches GA4. 
-    The order system records the money that actually moved, with its later corrections, so finance-grade metrics (revenue, margin, refund rate) come from orders, and GA4 is used for what it’s good at: how people got there and what they did before buying.
-    GA4 revenue is treated as indicative only; the reconciliation model quantifies the duplicates, unidentified purchases and untracked orders.
+- GA4 revenue is whatever the customer’s browser reported at the moment of checkout, and that number is unreliable due to the known data problems above under purchase: Duplicate purchase events double-count (November especially), 15.5% of purchases have no id to attribute it to, ad blockers and closed tabs mean some orders never fire the event at all, and nothing that happens afterwards (cancellations, returns, refunds, failed payments) ever reaches GA4. 
+- The order system records the money that actually moved, with its later corrections, so finance-grade metrics (revenue, margin, refund rate) come from orders, and GA4 is used for what it’s good at: how people got there and what they did before buying.
+- GA4 revenue is treated as indicative only; the reconciliation model quantifies the duplicates, unidentified purchases and untracked orders.
 
 ## Open questions for week 3
 
