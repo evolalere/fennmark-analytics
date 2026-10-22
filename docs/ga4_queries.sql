@@ -193,3 +193,17 @@ FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`,
 WHERE event_name = 'view_item'
 GROUP BY 1
 ORDER BY 2 DESC;
+
+-- q9_item_variants
+SELECT
+  i.item_id,
+  ANY_VALUE(i.item_name) AS item_name,
+  COUNT(DISTINCT IF(i.item_variant != '(not set)', i.item_variant, NULL)) AS variants,
+  STRING_AGG(DISTINCT IF(i.item_variant != '(not set)', i.item_variant, NULL), ', ' LIMIT 6) AS sample_variants,
+  COUNTIF(i.item_variant = '(not set)') / COUNT(*) AS share_not_set
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`, UNNEST(items) AS i
+WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+  AND event_name = 'purchase'
+GROUP BY 1
+ORDER BY variants DESC
+LIMIT 50;

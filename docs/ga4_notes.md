@@ -59,6 +59,7 @@
 - 396 distinct products bought across the period; 422 viewed. `(not set)` item names are negligible (9 item rows on view_item).
 - `item_category` is NOT a product taxonomy: it is the navigation path the shopper came through (`Home/Apparel/Men's / Unisex/`, `Men's / Unisex`, `Home/Sale/`, `Home/New/` for the same product), with inconsistent trailing slashes and ~8.6k empty values. Hence 75 "categories" on views vs 22 on purchases.
 - Decision: the generator's `products` table assigns one canonical category per product (most common path per item_name, with Home/, Sale, New and brand paths collapsed); `dim_products` uses that. Keep the raw path on view_item as a "found via" attribute for merchandising analysis in the funnel.
+- `item_variant` (q9) is 0% (not set) on purchases. Single Option Only is the sentinel for non-sized merch, so staging should map it to NULL rather than treat it as a size.
 
 ## Order funnel and what the backend will add
 
