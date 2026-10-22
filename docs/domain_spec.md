@@ -5,7 +5,7 @@ Status: draft, week 3
 - GA4 is the web-behaviour source
 - The generated backend is the system of record for orders, returns and NPS
 - They meet on ecommerce.transaction_id = orders.order_id
-## 2. Entities                              (A3: the entity table)
+## 2. Entities
 
 | Entity (raw table) | Grain: one row per | Key | Rows come from | Exists to answer |
 | --- | --- | --- | --- | --- |
@@ -19,6 +19,10 @@ Status: draft, week 3
 | nps_surveys | survey response | survey_id | Generated after a share of deliveries | NPS by month, product and delivery time |
 | marketing_spend | day × source/medium | (spend_date, source, medium) | Generated to match GA4 traffic_source values | CAC and ROAS per channel |
 | experiment_assignments | user × experiment | (user_pseudo_id, experiment_id) | Generated for users with a view_promotion event | Did the promotion variant lift conversion |                (B1: state diagram, transitions, timing)
+
+## 3. Identity rules                        (A4: customer, order, product keys)
+
+## 4. Order lifecycle                       (B1: state diagram, transitions, timing)
 
 ## 5. Returns and refunds                   (B3)
 
