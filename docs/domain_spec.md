@@ -30,7 +30,44 @@ Status: draft, week 3
 
 - Open question: Do GA4 item ids change over the 92 days for the same name?
 
-## 4. Order lifecycle                       (B1: state diagram, transitions, timing)
+## 4. Order lifecycle
+### State diagram
+
+```
+        placed      ->      paid        ->      shipped     ->      delivered           happy path
+        placed      ->      cancelled                                                   never paid: no refund
+        paid        ->      cancelled   ->      refunded                                cancelled before shipping
+        delivered   ->      returned    ->      refunded                                return within 30 days of delivery
+
+        Terminal states: delivered (closed), cancelled (unpaid), refunded.
+```
+
+### Transitions
+| From | To | Typical lag (generator) | Who triggers it | Notes |
+| --- | --- | --- | --- | --- |
+| (none) | placed | = GA4 purchase timestamp for seeded orders | customer | The only event every order has |
+| placed | paid | 0-30 min; ~5% never pay | payment provider | Unpaid orders are cancelled after 48 h |
+| paid | shipped | 1-3 days | warehouse  | Longer in the December peak |
+| shipped | delivered | 2-7 days | carrier | Delivery date drives NPS send |
+| placed / paid | cancelled | before shipped only | customer or system | Cancelling after shipping is not allowed; becomes a return. Unpaid orders are cancelled after 48 h; cancellation carries a reason (payment_failed, customer_request, out_of_stock, fraud_check) |
+| delivered | returned | within 30 days | customer | Only delivered orders can be returned |
+| cancelled (paid) / returned | refunded | 1-5 days | finance | Refund value ≤ order value, always |
+
+### Status rule (timing)
+- an order's status at time T is the state of its latest status event with event_timestamp ≤ T; its current status is the state of its latest event overall.
+- Every status event has a nullable reason; it is populated on cancelled and returned and NULL otherwise.
+
+### Illegal transitions
+-   The generator never produces these, and Week 10 tests that the data never contains them:
+
+| From | To | Why it is illegal |
+| --- | --- | --- |
+| shipped, delivered | cancelled | Once shipped, the customer must return it; cancellation is pre-shipment only |
+| placed, paid, shipped | returned | Only delivered orders can be returned |
+| placed (unpaid) | refunded | Nothing was paid, so nothing is refunded |
+| refunded | any state | Refunded is terminal |
+| delivered | any state except returned | Delivered is terminal unless a return is requested |
+| any state | placed | Placed is the first event and happens once |
 
 ## 5. Returns and refunds                   (B3)
 
