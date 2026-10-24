@@ -207,3 +207,21 @@ WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
 GROUP BY 1
 ORDER BY variants DESC
 LIMIT 50;
+
+-- q10_item_ids_and_names
+SELECT
+  i.item_id,
+  COUNT(DISTINCT i.item_name) AS names,
+  COUNT(DISTINCT i.item_category) AS categories,
+  STRING_AGG(DISTINCT i.item_name, ' | ' LIMIT 3) AS sample_names,
+  STRING_AGG(DISTINCT i.item_category, ' | ' LIMIT 3) AS sample_categories
+FROM
+  `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`,
+  UNNEST(items) AS i
+WHERE
+  _TABLE_SUFFIX BETWEEN '20201101' AND '20210131'
+  AND event_name = 'purchase'
+  AND i.item_id != '(not set)'
+GROUP BY 1
+HAVING names > 1 OR categories > 1
+ORDER BY names DESC;

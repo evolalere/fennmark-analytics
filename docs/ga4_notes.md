@@ -106,6 +106,8 @@
 
 ### Items
 - item_category is a breadcrumb path, not a category; canonical category must come from the backend.
+- 448 purchase events carry no order data at all: the items array is a single `(not set)` placeholder (NULL price, quantity and item_revenue) and `ecommerce.transaction_id` is `(not set)` too; never mixed with real lines on the same event. Treated as unmatchable: excluded from `stg_ga4__purchases` and `stg_ga4__purchase_items`, counted in the Week 7 reconciliation as "GA4 purchase with no order data". Overlaps with the ~15.5% `(not set)` transaction ids noted above. (q11)
+- `item_category` is unreliable for the same `item_id`: sometimes empty, sometimes a navigation label ("New", "Shop by Brand", "Campus Collection") rather than a product category; one id (9200364) has two name spellings. `item_id` itself is stable over the window. Decision: `products` keys on item_id, takes the most frequent non-empty name and category, and navigation labels are mapped to a real category per item_id via a seed file in Week 5 (domain_spec section 7). (q10)
 
 ## Decisions for week 3 and beyond
 - stg_ga4__purchases: coalesce the two id sources, drop (not set)/NULL into a flagged “unidentified purchase” bucket, deduplicate real ids to first event. (See known data problems above and saved queries below for purchases.)

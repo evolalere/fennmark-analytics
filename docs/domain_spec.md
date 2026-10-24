@@ -26,9 +26,10 @@ Status: draft, week 3
 | --- | --- | --- |
 | Customer | customers.customer_id is a generated surrogate; customers.user_pseudo_id holds the GA4 cookie id it was seeded from (NULL for backend-only customers). One cookie (user_pseudo_id) maps to at most one customer in the generator; Week 7 stitching goes cookie → customer. | user_id is 0% populated in the sample, so the cookie is the only identifier GA4 offers. Saying "at most one" now is what makes the duplicate-customer problem in C1 a deliberate injection rather than an accident. |
 | Order | orders.order_id = GA4 ecommerce.transaction_id for seeded orders; backend-only orders get ids in the same format with a distinguishable prefix (e.g. B-). | The join must need no mapping table. The prefix lets Week 7's reconciliation count GA4-only, matched and backend-only without a flag column. |
-| Product | products.product_id = GA4 items.item_id where present; item_name is kept as the display name, item_category as the category. | GA4's items carry an id; inventing a second one would create a mapping problem with no analytical value. GA4 item_id is already SKU grain (one id per size, e.g. three ids for the Navy Crewneck Sweatshirt), so it is the product key as-is. |
+| Product | products.product_id = GA4 items.item_id where present; item_name is kept as the display name, item_category as the category. | GA4's items carry an id; inventing a second one would create a mapping problem with no analytical value. GA4 item_id is already SKU grain (one id per size, e.g. three ids for the Navy Crewneck Sweatshirt), so it is the product key as-is. item_id is stable over the window (one id never changes name except one spelling variant); products keys on it. (q10) |tem_id is stable over the window (one id never changes name except one spelling variant); products keys on it. (q10) |tem_id is stable over the window (one id never changes name except one spelling variant); products keys on it. (q10) |tem_id is stable over the window (one id never changes name except one spelling variant); products keys on it. |
 
 - Open question: Do GA4 item ids change over the 92 days for the same name?
+- Answer: item_id is a stable key. 154 ids out of a few hundred drift, and almost all of it is one pattern: the second “category” is an empty string, not a different category. So that’s a null-handling issue, not a key problem. The one real rename is 9200364 (the Shoreline bottle, two name spellings) - See [Exploration queries](docs/ga4_queries.sql) q10
 
 ## 4. Order lifecycle
 ### State diagram
@@ -69,11 +70,53 @@ Status: draft, week 3
 | delivered | any state except returned | Delivered is terminal unless a return is requested |
 | any state | placed | Placed is the first event and happens once |
 
-## 5. Returns and refunds                   (B3)
+## 5. Returns and refunds
+- Two tables not folded into status events:
+### Returns
 
-## 6. What is seeded from GA4               (B2: the seeding map, shares, time window)
+| return_id | order_id | order_item_id (nullable: whole-order return) | requested_at | reason | accepted |
+| --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |
+### Refunds
+
+| refund_id | order_id | return_id (nullable: cancellation refund) | amount | currency | refunded_at |
+| --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  |  |
+
+- Two tables not folded into status events because: a return is a request that can be refused, a refund is money; they have different grains and different owners, and fct_returns in Week 8 needs reasons and acceptance, which a status event does not carry.
+- Also, one of the tests planned "a refund never exceeds the order value" needs refunds.amount to exist as its own column.
+
+## 6. What is seeded from GA4
+### The seeding map and shares
+
+| Table | From GA4 | Generated independently | Target share |
+| --- | --- | --- | --- |
+| orders | Deduplicated purchase events with a usable transaction id: id, timestamp, user, revenue, currency | Payment method, shipping country, discount, status; backend-only orders (phone, app, ad-blocked) | ~90% seeded / ~10% backend-only. Separately, ~5% of GA4 purchases get no order (payment failed) |
+| order_items | items[] on seeded purchases: product, quantity, price | Lines for backend-only orders | Follows orders |
+| products | Distinct items in GA4 | Cost price (what Fennmark pays the supplier) = 40–70% of the selling price (GA4 items.price), supplier, launch date | 100% of GA4 items; no invented products |
+| customers  | Distinct purchasing user_pseudo_id | Name, country, email consent, acquisition date; customers behind backend-only orders | ~90% seeded |
+| marketing_spend | traffic_source.source / medium values and their daily session counts, as the shape to spend against | Daily spend per channel | 100% generated, shaped by GA4 |
+| experiment_assignments | Users with view_promotion events | Variant assignment | See section 8 below |
+| order_status_events, returns, refunds, nps_surveys | Nothing  | Everything, from the lifecycle in section 4 | 100% generated |
+
+### Time window
+- GA4 covers 2020-11-01 to 2021-01-31.
+- Orders placed on 31 January are still being shipped, delivered, returned and refunded in February and March.
+- As a result, backend events run to 2021-03-15; the reporting period in marts is 2020-11-01 to 2021-01-31 by order date; status events after 31 January are kept so that order status is correct as of any date.
+
+### Currency
+- GA4 purchase_revenue in the sample is USD.
+- The backend's base currency is USD, orders carries a currency column, and a handful of orders will deliberately say EUR (Section 7).
 
 ## 7. Planned data problems                 (C1: table with detection plan)
+
+| Problem | Detected / handled |
+| --- | --- |
+| item_name / item_category vary for the same item_id (empty strings, one rename, nav labels like “Shop by Brand” as category) | Week 5/6: products takes the most frequent non-empty name and category per id; unique + not_null tests on product_id; Navigation labels like “Shop by Brand”, “Campus Collection” and “New” mapped to a real category per item_id by a small seed file. |category vary for the same item_id (empty strings, one rename, nav labels like “Shop by Brand” as category) | Week 5/6: products takes the most frequent non-empty name and category per id; unique + not_null tests on product_id; nav labels mapped to a real category by a small seed file |
+
+
+- data-problem table. The “GA4 purchases with no backend order (~5%)” row already exists; change its “How injected” cell to “Generator skips them: payment declined before the order was created” so it’s clear this is the pre-order failure and the placed → cancelled path is the post-order one.
+
 
 ## 8. Experiment                            (C3: the promotion A/B test)
 
@@ -82,3 +125,4 @@ Status: draft, week 3
 ## 10. Out of scope                         (C5)
 - multi-touch attribution
 - product_variants dimension: not needed, GA4 item_id is already SKU grain; revisit only if per-variant stock is modelled.
+- Checkout and web errors: not an order-system concern; the sample has no exception events, so begin_checkout without purchase in fct_sessions is the only abandonment proxy.
