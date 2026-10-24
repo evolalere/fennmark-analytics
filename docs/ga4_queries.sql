@@ -225,3 +225,49 @@ WHERE
 GROUP BY 1
 HAVING names > 1 OR categories > 1
 ORDER BY names DESC;
+
+-- q11_Week 3: purchase events with no order data (items and transaction_id all '(not set)')
+SELECT
+  i.item_id,
+  i.item_name,
+  item_category
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`,
+     UNNEST(items) AS i
+WHERE _TABLE_SUFFIX BETWEEN '20201229' AND '20210102'
+  AND event_name = 'purchase'
+GROUP BY 1,2,3
+ORDER BY  i.item_name
+LIMIT 100;
+
+SELECT
+  i.item_id,
+  i.item_name,
+  item_category,
+    i.price,
+  i.quantity,
+  i.item_revenue,
+    user_pseudo_id,
+  ecommerce.transaction_id
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`,
+     UNNEST(items) AS i
+WHERE _TABLE_SUFFIX BETWEEN '20201229' AND '20210102'
+  AND event_name = 'purchase'
+GROUP BY 1,2,3,4,5,6,7,8
+ORDER BY  i.item_name
+LIMIT 100;
+
+
+SELECT
+  COUNTIF(real_items = 0) AS events_with_only_unset,
+  COUNTIF(real_items > 0) AS events_with_unset_and_real
+FROM (
+  SELECT event_timestamp, user_pseudo_id,
+         COUNTIF(i.item_id != '(not set)') AS real_items,
+         COUNTIF(i.item_id = '(not set)') AS unset_items
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`, UNNEST(items) AS i
+  WHERE _TABLE_SUFFIX BETWEEN '20201101' AND '20210131' AND event_name = 'purchase'
+  GROUP BY 1, 2
+)
+WHERE unset_items > 0;
+-- result: 448 / 0
+
