@@ -29,7 +29,7 @@ Status: draft, week 3
 | Product | products.product_id = GA4 items.item_id where present; item_name is kept as the display name, item_category as the category. | GA4's items carry an id; inventing a second one would create a mapping problem with no analytical value. GA4 item_id is already SKU grain (one id per size, e.g. three ids for the Navy Crewneck Sweatshirt), so it is the product key as-is. item_id is stable over the window (one id never changes name except one spelling variant); products keys on it. (q10) |tem_id is stable over the window (one id never changes name except one spelling variant); products keys on it. (q10) |tem_id is stable over the window (one id never changes name except one spelling variant); products keys on it. (q10) |tem_id is stable over the window (one id never changes name except one spelling variant); products keys on it. |
 
 - Open question: Do GA4 item ids change over the 92 days for the same name?
-- Answer: item_id is a stable key. 154 ids out of a few hundred drift, and almost all of it is one pattern: the second “category” is an empty string, not a different category. So that’s a null-handling issue, not a key problem. The one real rename is 9200364 (the Shoreline bottle, two name spellings) - See [Exploration queries](docs/ga4_queries.sql) q10
+- Answer: item_id is a stable key. 154 ids out of a few hundred drift, and almost all of it is one pattern: the second “category” is an empty string, not a different category. So that’s a null-handling issue, not a key problem. The one real rename is 9200364 (the Shoreline bottle, two name spellings) - See [q10](ga4_queries.sql)
 
 ## 4. Order lifecycle
 ### State diagram
