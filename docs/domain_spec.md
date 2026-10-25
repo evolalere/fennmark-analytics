@@ -108,15 +108,27 @@ Status: draft, week 3
 - GA4 purchase_revenue in the sample is USD.
 - The backend's base currency is USD, orders carries a currency column, and a handful of orders will deliberately say EUR (Section 7).
 
-## 7. Planned data problems                 (C1: table with detection plan)
+## 7. Planned data problems
 
-| Problem | Detected / handled |
-| --- | --- |
-| item_name / item_category vary for the same item_id (empty strings, one rename, nav labels like “Shop by Brand” as category) | Week 5/6: products takes the most frequent non-empty name and category per id; unique + not_null tests on product_id; Navigation labels like “Shop by Brand”, “Campus Collection” and “New” mapped to a real category per item_id by a small seed file. |category vary for the same item_id (empty strings, one rename, nav labels like “Shop by Brand” as category) | Week 5/6: products takes the most frequent non-empty name and category per id; unique + not_null tests on product_id; nav labels mapped to a real category by a small seed file |
+| Layer | Problem | Table | How injected (Week 4) | Detected / handled in |
+| --- | --- | --- | --- | --- |
+| Real GA4 | Duplicate purchase events per transaction (~324) | GA4 events | Already there | Week 6: stg_ga4__purchases dedups, first event wins; unique test on transaction_id |
+| Real GA4 | (not set) transaction ids (15.5% of purchases) | GA4 events | Already there | Week 6: excluded from stg_ga4__purchases, counted in reconciliation as unmatchable |
+| Real GA4 | user_id never populated | GA4 events | Already there | Week 7: stitching is cookie → customer; documented limitation |
+| Real GA4 | item_name / item_category vary for the same item_id (empty strings, one rename, navigation labels like “Shop by Brand”, “Campus Collection” and “New” as category) | GA4 events | Already there | Week 5/6: products takes the most frequent non-empty name and category per id; unique + not_null tests on product_id; navigation labels mapped to a real category per item_id by a small seed file |
+| Real GA4 | 448 purchase events with no order data (items array is one (not set) placeholder, NULL price/quantity, transaction id (not set)) | GA4 events | Already there | Week 6: excluded from stg_ga4__purchases and stg_ga4__purchase_items; Week 7: counted as “GA4 purchase with no order data” |
+| Reconciliation | GA4 purchases with no backend order (~5%) | orders | Generator skips them: payment declined before the order was created | Week 7: reconciliation category GA4-only; dashboard Week 12 |
+| Reconciliation | Backend orders GA4 never saw (~10%) | orders | Generated with B- ids | Week 7: category backend-only |
+| Reconciliation | GA4 revenue ≠ backend revenue on matched orders | orders | Discounts applied after the event; rounding | Week 7: revenue delta column; Week 15 case-study trade-off |
+| Backend mess | Duplicate customer rows (same cookie, two ids) | customers | ~2% of customers duplicated with a later created_at (a created_at later than the original) | Week 5: dedup in staging, keep earliest; unique test on user_pseudo_id |
+| Backend mess | Late-arriving status events | order_status_events | loaded_at 1-3 days after event_timestamp for ~10% of events | Week 9: incremental lookback window; test that status never regresses |
+| Backend mess | Mixed timestamp formats | order_status_events | Column exported as string; two formats, one with offset | Week 5: safe.parse_timestamp with both formats; not_null test after parsing |
+| Backend mess | NULL consent flags | customers | ~15% NULL in email_consent | Week 5: cast to boolean, keep NULL; accepted_values test; marts treat NULL as not consented |
+| Backend mess | Currency mismatch | orders | ~20 orders with currency = 'EUR' | Week 5: flag column; Week 10 singular test that revenue is reported in one currency |
+| Backend mess | Mid-history schema change | orders | ship_country renamed to shipping_country from 2021-01-01 (two raw files) | Week 5: coalesce in staging; documented in sources.yml |
+| Backend mess | Refunds for orders never delivered or cancelled | refunds | ~1% of refunds reference an order in shipped | Week 10: singular test; surfaces as a data-quality metric, not silently dropped |
 
-
-- data-problem table. The “GA4 purchases with no backend order (~5%)” row already exists; change its “How injected” cell to “Generator skips them: payment declined before the order was created” so it’s clear this is the pre-order failure and the placed → cancelled path is the post-order one.
-
+- The ~ figures are targets for the generator, not promises. 
 
 ## 8. Experiment                            (C3: the promotion A/B test)
 
