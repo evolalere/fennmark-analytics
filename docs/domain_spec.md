@@ -130,11 +130,50 @@ Status: draft, week 3
 
 - The ~ figures are targets for the generator, not promises. 
 
-## 8. Experiment                            (C3: the promotion A/B test)
+## 8. Experiment Design
 
-## 9. Business questions                    (C4: one per mart)
+| Element | Decision | Because |
+| --- | --- | --- |
+| Hypothesis | Showing the promotion banner variant B (bigger discount badge) increases purchase conversion among users who see a promotion | One metric, one direction |
+| Unit of assignment | user_pseudo_id | The only stable id in GA4; a user keeps one variant across sessions |
+| Population | Users with at least one view_promotion event in the window | No exposure, no assignment; keeps the readout honest |
+| Split | 50 / 50, assigned by hashing the cookie id with the fixed seed | Reproducible from the generator's seed |
+| Primary metric | Purchase conversion within 7 days of first exposure (any order, GA4 or backend) | Orders are the system of record; 7 days covers the sample's typical consideration time |
+| Guardrail | Return rate within 30 days | A bigger badge that increases returns is not a win |
+| Injected effect | +1.5 percentage points absolute on conversion for B; no effect on return rate | Big enough to detect at the sample's size, small enough to need a confidence interval; Week 13 checks the sample-size maths |
+| Duration | Entire GA4 window; assignment timestamp = first Entire GA4 window; assignment timestamp = first exposure | The readout filters by exposure date |
 
-## 10. Out of scope                         (C5)
-- multi-touch attribution
+- **Why a 50/50 split, not exposed vs. unexposed.** The design is: everyone in the population saw a promotion banner. Half were shown the existing one (control, variant A), half the new one with the bigger badge (treatment, variant B). Because the assignment is random, the two halves are alike in every way except the banner, so any difference in conversion is the banner’s effect. 50/50 is simply the split that gives the most statistical power for a given number of exposed users; you’d only go unequal if the treatment was risky and you wanted to limit exposure. That’s also why the population is “users with at least one view_promotion”: in GA4 terms that event is the exposure, and assignment happens at the moment of first exposure.
+
+- **Why a guardrail.** A guardrail is a second metric to watch, not to win on, but to make sure the win isn’t fake. The primary metric says whether variant B sells more; the guardrail says whether it does so by causing harm somewhere else. Here it’s the 30-day return rate: a louder discount badge could push people into impulse orders they then send back, so conversion goes up, returns go up, and net revenue is flat or worse. The decision rule is “ship B if conversion rises and return rate doesn’t”, and the Week 13 memo reports both.
+
+- **Injected effect.** Because the backend is generated, there’s no real banner effect to discover; the generator has to put one in. “Injected effect: +1.5 percentage points” means the generator gives treatment users a conversion probability 1.5 pp higher than control (say 3.5% vs 2.0%), and leaves the return rate identical in both groups so the guardrail stays clean. The Week 13 readout then has a known answer to check itself against: if the analysis finds roughly +1.5 pp with a confidence interval that excludes zero, the statistics are right. It’s chosen small enough that you need a proper test to see it, not so small that the sample can’t detect it. The README states plainly that the effect is injected, which is the honesty test.
+
+- **Limitation.** The effect is injected into the generated backend orders, not into GA4 behaviour, so the readout tests the statistics, not a real finding. The README (Week 14) says so.
+
+## 9. Business questions
+
+- Week 8's done-when is "each mart answers one written business question". Writing the questions now, before any model exists, is what keeps the marts honest. One question per planned mart; a question is good when the answer is a number with a breakdown and a time period.
+
+| Mart (Week 8) | Question |
+| --- | --- |
+| fct_orders | What were net revenue and order count per week by channel, and what share of orders did GA4 miss? |
+| fct_order_items | Which products and categories carry the margin, and which sell volume at low margin? |
+| dim_customers | What share of customers in the period are repeat buyers, and how many consented to email? |
+| dim_products | How many products were launched in the window, and how long until first sale? |
+| fct_sessions | What is the view-to-purchase funnel by device category, and where is the biggest drop? |
+| fct_returns | What is the return rate by product category and channel, and what are the top reasons? |
+| fct_nps | What is NPS by delivery month, and does it move with shipping time? |
+| Reconciliation (Week 7) | For the period, how many orders are matched, GA4-only and backend-only, and what is the revenue gap on matched orders? |
+
+- **Reconciliation.** The last row in the table isn’t a mart; it’s the Week 7 intermediate model that compares the two sources order by order. It takes every deduplicated GA4 purchase and every backend order, joins them on transaction_id = order_id, and sorts the result into three buckets: matched (in both), GA4-only (purchase event, no order: payment failed), backend-only (order, no event: phone, app, ad blocker). For matched orders it also computes the revenue difference, which is rarely zero (discounts after the event, item_revenue vs gross, rounding).
+- The business question for it is therefore: how many orders fall in each bucket, and how big is the revenue gap on matched orders? It’s the one answer to the question that frequently arise when finance and marketing report different numbers.
+
+## 10. Out of scope
+- Inventory and stock levels
+- Multi-currency conversion
+- Customer support tickets
+- Product reviews
+- Multi-touch attribution
 - product_variants dimension: not needed, GA4 item_id is already SKU grain; revisit only if per-variant stock is modelled.
 - Checkout and web errors: not an order-system concern; the sample has no exception events, so begin_checkout without purchase in fct_sessions is the only abandonment proxy.
