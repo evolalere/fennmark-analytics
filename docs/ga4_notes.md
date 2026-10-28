@@ -109,6 +109,14 @@
 - 448 purchase events carry no order data at all: the items array is a single `(not set)` placeholder (NULL price, quantity and item_revenue) and `ecommerce.transaction_id` is `(not set)` too; never mixed with real lines on the same event. Treated as unmatchable: excluded from `stg_ga4__purchases` and `stg_ga4__purchase_items`, counted in the Week 7 reconciliation as "GA4 purchase with no order data". Overlaps with the ~15.5% `(not set)` transaction ids noted above. (q11)
 - `item_category` is unreliable for the same `item_id`: sometimes empty, sometimes a navigation label ("New", "Shop by Brand", "Campus Collection") rather than a product category; one id (9200364) has two name spellings. `item_id` itself is stable over the window. Decision: `products` keys on item_id, takes the most frequent non-empty name and category, and navigation labels are mapped to a real category per item_id via a seed file in Week 5 (domain_spec section 7). (q10)
 
+### Traffic source
+
+- `traffic_source.source`, `medium` and `name` (campaign) carry the literal value `(data deleted)` on part of the sessions: an artefact of Google's obfuscation of the public sample, not a tracking gap. Found in the Week 4 extract (sessions_by_source, 917 day × source/medium/campaign rows).
+- `traffic_source` in the GA4 export is the user's *first-touch* source, not the session's; fine for shaping generated spend, not for session-level attribution.
+- Decision: keep the rows (session counts are real), generate spend = 0 for them, and group `(data deleted)` with `(not set)` and `(none)` as "unattributed" in marts. Documented on the GA4 source in Week 5's sources.yml.
+- session_start-based count is 354,857 vs 360,129 distinct sessions across all events; ~1.5% of sessions have no session_start event in the window.
+- In Week 7, sessionisation should define a session from its first event of any name, not from session_start, or fct_sessions will be short by the same 1.5%.
+
 ## Decisions for week 3 and beyond
 - stg_ga4__purchases: coalesce the two id sources, drop (not set)/NULL into a flagged “unidentified purchase” bucket, deduplicate real ids to first event. (See known data problems above and saved queries below for purchases.)
 - Generator seeds orders from the ~4,460 real ids. The 883 unidentified purchases are the realistic “GA4 saw a purchase but can’t tell us which order” category in Week 7’s reconciliation; no need to invent a further 5% of failed payments on top, the data already provides it.

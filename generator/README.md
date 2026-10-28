@@ -48,6 +48,19 @@
 | created_at | TIMESTAMP | ~2% of customers appear twice: same user_pseudo_id and email, new customer_id, later created_at   <- duplicate customers |
 | loaded_at | TIMESTAMP |  |
 
+## Catalogue (week 4 extract)
+
+The `items` extract keys on GA4 `item_id`, which is SKU grain (one id per size or option), so its counts differ from the product-name counts in `docs/ga4_notes.md`:
+
+| Measure | Count | Week 2 equivalent |
+| --- | --- | --- |
+| SKUs (distinct `item_id` on view_item or purchase) | 1,231 | n/a: Week 2 counted names |
+| SKUs sold at least once | 809 | 396 product names bought (~2 sizes per product) |
+| Distinct product names | 428 | 422 viewed; the extra are spelling variants across ids (q10) |
+| SKUs viewed but never sold | 422 | n/a |
+
+All 1,231 SKUs go into `products`; the 422 never sold are what dim_products' time-to-first-sale question needs. Source extract: 4,451 identifiable purchases, 13,218 purchase lines (after dropping the placeholder lines and `(not set)` ids); 354,857 sessions by source/medium/campaign (917 rows); 102,443 promotion-exposed users.
+
 ## products  (one row per SKU; 100% from GA4 items, keyed on item_id)
 
 | Column | Type | Note |

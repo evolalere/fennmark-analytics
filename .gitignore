@@ -238,3 +238,8 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# Generator
+generator/cache/
+generator/output/
