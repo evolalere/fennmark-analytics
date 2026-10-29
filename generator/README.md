@@ -59,7 +59,8 @@ The `items` extract keys on GA4 `item_id`, which is SKU grain (one id per size o
 | Distinct product names | 428 | 422 viewed; the extra are spelling variants across ids (q10) |
 | SKUs viewed but never sold | 422 | n/a |
 
-All 1,231 SKUs go into `products`; the 422 never sold are what dim_products' time-to-first-sale question needs. Source extract: 4,451 identifiable purchases, 13,218 purchase lines (after dropping the placeholder lines and `(not set)` ids); 354,857 sessions by source/medium/campaign (917 rows); 102,443 promotion-exposed users.
+- All 1,231 SKUs go into `products`; the 422 never sold are what dim_products' time-to-first-sale question needs. Source extract: 4,451 identifiable purchases, 13,218 purchase lines (after dropping the placeholder lines and `(not set)` ids); 354,857 sessions by source/medium/campaign (917 rows); 102,443 promotion-exposed users.
+- NULLs in products: variant 157, category and supplier 6 (SKUs with no non-empty value on any event).
 
 ## products  (one row per SKU; 100% from GA4 items, keyed on item_id)
 

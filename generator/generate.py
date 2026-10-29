@@ -185,15 +185,77 @@ def make_random(seed: int) -> tuple[np.random.Generator, Faker]:
 
 
 # --------------------------------------------------------------------------- #
-# Builders (sessions A3 onwards fill these in, in pipeline order)
+# Builders
 # --------------------------------------------------------------------------- #
 
 def build_products(ga4, cfg, rng, fake) -> pd.DataFrame:
-    raise NotImplementedError("A3")
+    items = ga4["items"].sort_values("item_id").reset_index(drop=True)
+
+    # cost band by keyword match on category, default otherwise
+    bands = cfg["cost_price_share"]
+    def band(cat):
+        for key, rng_ in bands.items():
+            if key != "default" and isinstance(cat, str) and key.lower() in cat.lower():
+                return rng_
+        return bands["default"]
+    low_high = np.array([band(c) for c in items["item_category"]])
+    share = rng.uniform(low_high[:, 0], low_high[:, 1])
+
+    # one supplier per category, assigned in sorted-category order so it is stable
+    cats = sorted(items["item_category"].dropna().unique())
+    supplier_of = {c: fake.company() for c in cats}
+
+    first_seen = pd.to_datetime(items["first_seen"], utc=True)
+    launch = first_seen - pd.to_timedelta(rng.integers(30, 366, len(items)), unit="D")
+    loaded_at = pd.Timestamp(cfg["window"]["end"], tz="UTC") + pd.Timedelta(days=1, hours=2)
+
+    products = pd.DataFrame({
+        "product_id":   items["item_id"],
+        "product_name": items["item_name"],
+        "variant":      items["item_variant"],
+        "category":     items["item_category"],
+        "list_price":   items["price"].astype(float),
+        "cost_price":   (items["price"].astype(float) * share).round(2),
+        "supplier":     items["item_category"].map(supplier_of),
+        "launch_date":  launch.dt.date,
+        "loaded_at":    loaded_at,
+    })
+
+    assert products["product_id"].is_unique and products["product_id"].notna().all()
+    assert (products["list_price"] > 0).all(), "list_price must be > 0"
+    assert (products["cost_price"] < products["list_price"]).all()
+    print(f"[products] {len(products):,} rows")
+    return products
 
 
 def build_customers(ga4, cfg, rng, fake) -> pd.DataFrame:
-    raise NotImplementedError("A4")
+    pl = ga4["purchase_lines"].copy()
+    pl["placed_at"] = pd.to_datetime(pl["placed_at"], utc=True)
+    first = (pl.sort_values("placed_at")
+               .groupby("user_pseudo_id", sort=False)
+               .agg(first_placed_at=("placed_at", "min"), country=("country", "first"))
+               .reset_index()
+               .sort_values(["first_placed_at", "user_pseudo_id"])
+               .reset_index(drop=True))
+    n = len(first)
+    consent = rng.choice(np.array(["true", "false", None], dtype=object),
+                         size=n, p=[0.55, 0.30, cfg["shares"]["consent_null"]])
+    created_at = first["first_placed_at"] - pd.to_timedelta(rng.integers(1, 181, n), unit="min")
+    customers = pd.DataFrame({
+        "customer_id":      [f"C-{i:06d}" for i in range(1, n + 1)],
+        "user_pseudo_id":   first["user_pseudo_id"],
+        "full_name":        [fake.name() for _ in range(n)],
+        "email":            [fake.email() for _ in range(n)],
+        "country":          first["country"],
+        "email_consent":    consent,
+        "acquisition_date": first["first_placed_at"].dt.date,
+        "created_at":       created_at,
+        "loaded_at":        created_at + pd.to_timedelta(rng.integers(1, 31, n), unit="min"),
+    })
+    assert customers["customer_id"].is_unique and customers["user_pseudo_id"].is_unique
+    print(f"[customers] {n:,} seeded rows, "
+          f"{customers['email_consent'].isna().mean():.1%} consent NULL")
+    return customers
 
 
 # --------------------------------------------------------------------------- #
@@ -208,8 +270,8 @@ def main() -> None:
     client = bigquery.Client(project=cfg["bigquery"]["project"], location="US")
 
     ga4 = extract_ga4(client)
-    # products = build_products(ga4, cfg, rng, fake)
-    # customers = build_customers(ga4, cfg, rng, fake)
+    products = build_products(ga4, cfg, rng, fake)
+    customers = build_customers(ga4, cfg, rng, fake)
     # ... B1 onwards
 
 
