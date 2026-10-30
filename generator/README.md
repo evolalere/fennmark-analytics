@@ -146,3 +146,20 @@ The `items` extract keys on GA4 `item_id`, which is SKU grain (one id per size o
 | assigned_at | TIMESTAMP | = first view_promotion event for that user |
 | loaded_at | TIMESTAMP |  |
 
+## Further notes
+### Known reasons GA4 and backend revenue do not reconcile
+
+Measured on the week 4 run (seed 20201101). None of these are bugs; each is a documented gap the `rec_ga4_vs_backend` model in week 7 must account for, in this order.
+
+1. **GA4 line revenue is not price × quantity.** On the GA4 side, `item_revenue` is net of line-level discounts and rounding, while `price` is a whole-dollar unit price. `order_items.line_revenue` carries `item_revenue` unchanged; `unit_price × quantity` is the gross line value. Both are kept so the gap is visible, not hidden.
+2. **GA4 order revenue is not the sum of its lines.** 18.5% of GA4-seeded orders have `SUM(item_revenue) ≠ purchase_revenue` in the source data itself (tax, shipping and rounding on Google's side). `orders.gross_revenue` is `purchase_revenue`; the line sum is what `order_items` adds up to. This gap exists before the generator touches anything.
+3. **Backend discounts applied after the GA4 event.** 14.9% of seeded orders carry a `discount_amount` (5-15% of gross) that GA4 never saw. Net backend revenue = `gross_revenue − discount_amount`; GA4 reports gross.
+4. **Orders GA4 never saw.** 421 backend-only orders (`B-` ids, phone and app channel, 9.1% of orders) have no GA4 purchase; they are backend-only in the reconciliation.
+5. **GA4 purchases that never became orders.** 239 identifiable GA4 purchases (5.4%) were declined at payment; their ids are in `output/_ga4_only_ids.csv` (not loaded). Together with the 883 purchases with no `transaction_id` they form the GA4-only bucket.
+6. **Currency mismatch.** 20 orders are flagged `EUR` with USD amounts unchanged; a naive sum mixes currencies.
+7. **Same SKU at different prices in the same week.** `products.list_price` is the modal price; the price actually charged is on `order_items.unit_price`. Reconciling against list price produces an unexplained gap; reconcile against `unit_price`.
+
+Expected outcome in week 7: matched orders reconcile exactly on gross once (2) is accepted as a source-side gap, and the remaining delta is fully explained by (3)-(6).
+
+### Customers
+- 72 duplicate customer rows; only 3 orders attributed to the duplicate, since repeat buying is rare in the window.
