@@ -1,5 +1,14 @@
 # Column-level schemas in generator
 
+## How to run
+
+    source .venv/bin/activate
+    pip install -r generator/requirements.txt
+    python generator/generate.py            # extract (cached), build, write CSVs, load to fm_raw
+    python generator/generate.py --no-load  # write CSVs only
+
+First run executes four aggregate queries against the GA4 public sample (a few GB scanned in total, once) and caches them as parquet in `generator/cache/`; later runs read the cache and never touch GA4. Runtime: ~1 minute with a warm cache. The load truncates and rebuilds every table in `fm_raw`. Two runs with the same seed produce byte-identical `generator/output/*.csv` (verified with md5sum). Seed, shares and lags live in `generator/config.yml`.
+
 ## Note
 - Every table has loaded_at. It is what Week 5's freshness checks and Week 9's incremental models key on.
 - Foreign keys are written as -> table comments. Week 8's relationships tests are this list, verbatim.
@@ -163,3 +172,40 @@ Expected outcome in week 7: matched orders reconcile exactly on gross once (2) i
 
 ### Customers
 - 72 duplicate customer rows; only 3 orders attributed to the duplicate, since repeat buying is rare in the window.
+
+### Generated figures worth knowing (week 4 run, seed 20201101)
+
+These are properties of the generated backend, not findings about any real business. They are listed so that the marts in weeks 6-8 can be checked against what was put in.
+
+- **NPS overall: +7** (4,195 surveys sent, 40% responded). The score is generated with shipping time and returns as drivers: orders delivered more than 5 days after shipping draw from a detractor-heavy band, and a return requested before the response shifts it further. The peak-season shipping lag (7-23 Dec) therefore pulls December NPS down; `fct_nps` should be able to show NPS by delivery-time bucket and by month, and the December dip is the expected answer.
+- **Lifecycle:** 346 cancelled (7.5%; 5% unpaid, the rest after payment), 4,195 delivered, ~2% stuck at shipped at window end.
+- **Returns:** 358 (8.5% of delivered), 85% accepted; reasons weighted by category (wrong_size for apparel, damaged for drinkware).
+- **Refunds:** 441, of which 4 are deliberately bad (refund on an order whose latest status is shipped, no return, no status event).
+- **Duplicate customers:** 72 rows; only 3 orders attributed to the duplicate, since repeat buying is rare in the window.
+- **Marketing spend** $27,620 over 92 days (~9% of gross revenue), 10% of source/medium/campaign rows paid, rest zero (organic, direct, (data deleted)).
+
+- **Final run:** NPS +6 (4,918 surveys), 428 cancelled, 4,918 delivered, 373 returns (84% accepted), 456 refunds incl. 5 bad, marketing spend $28,452 (~9% of gross revenue).
+
+### Problem ledger (week 4 run, seed 20201101)
+
+Verified in BigQuery with `generator/checks.sql` after the load. Targets are from `docs/domain_spec.md` section 7; achieved figures are what the generator produced.
+
+| Problem | Table | Target | Achieved | Check |
+| --- | --- | --- | --- | --- |
+| GA4 purchases with no backend order | orders | ~5% | 239 of 4,451 (5.4%) | `output/_ga4_only_ids.csv` (not loaded; week 7 answer key) |
+| Backend orders GA4 never saw | orders | ~10% | 1,246 (22.8%) | `order_id LIKE 'B-%'`. 10% regular phone/app orders plus 825 forced A/B treatment conversions, see below |
+| GA4 revenue ≠ backend revenue | orders, order_items | ~15% discounted | 628 (11.5% of all orders; 14.9% of GA4-seeded) | `discount_amount > 0`. Backend-only orders carry no discount, which dilutes the share. Plus 18.5% of seeded orders where line sum ≠ gross in GA4 itself |
+| Duplicate customers | customers | ~2% | 73 rows (7 orders re-pointed) | `user_pseudo_id` with more than one row |
+| NULL consent | customers | ~15% | 711 (15.1%) | `email_consent IS NULL` |
+| Late-arriving status events | order_status_events | ~10% | 2,226 (10.2%) | `loaded_at > event_ts + 1 day` |
+| Mixed timestamp formats | order_status_events | ~10% | 2,176 (10.0%) ISO+offset; 0 unparseable | `event_ts_raw LIKE '%T%'`; both formats parse with the week 5 expression |
+| Currency mismatch | orders | 20 | 20 | `currency = 'EUR'`, amounts unchanged |
+| Mid-history schema change | orders | all rows | 4,263 `ship_country` / 1,195 `shipping_country`, 0 mismatched | each column NULL exactly where the other is filled |
+| Bad refunds | refunds | ~1% | 5 | refund on an order whose latest status is `shipped`, no return, no status event |
+| Injected A/B effect | experiment_assignments, orders | +1.5 pp | control 2.66%, treatment 4.15% (+1.49 pp) | 7-day conversion after first `view_promotion`, 102,443 users |
+
+Foreign keys (orders→customers, order_items→orders/products, order_status_events→orders, returns→orders, refunds→returns, nps_surveys→orders): 0 orphans each.
+
+**About the A/B effect.** The lift is injected: 825 treatment users who never bought were given a backend-only (phone/app) order within 7 days of exposure, since GA4 purchase events cannot be generated. The readout in week 13 must therefore count conversions from `orders`, not from GA4 purchases, and the lift appearing only in non-web channels is a known tell that the effect is synthetic. Control conversion was left untouched (2.65% before, 2.66% after).
+
+**Monetary columns** are FLOAT64 in raw (the generator loads pandas floats); staging casts to NUMERIC.

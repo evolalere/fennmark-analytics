@@ -2,7 +2,7 @@
 seed: 20201101 # GA4 window's first day because it's easy to remember. Any integer will work.
 bigquery:
   project: fennmark-analytics
-  dataset: raw
+  dataset: fm_raw
   ga4: bigquery-public-data.ga4_obfuscated_sample_ecommerce
 window: {start: "2020-11-01", end: "2021-01-31"}
 shares:
@@ -29,7 +29,7 @@ lags_days:
   refund_after_trigger: [1, 5]
   return_window: 30
 cost_price_share: {Apparel: [0.40, 0.55], Drinkware: [0.45, 0.65], Stationery: [0.50, 0.70], default: [0.45, 0.70]}
-spend_per_session_usd: {google/cpc: 0.90, facebook/cpc: 0.60, default_paid: 0.75}
+spend_per_session_usd: {google/cpc: 1.80, facebook/cpc: 1.20, default_paid: 1.50}
 experiment:
   id: promo_badge_v1
   effect_pp: 0.015
