@@ -39,8 +39,9 @@ First run executes four aggregate queries against the GA4 public sample (a few G
 | --- | --- | --- |
 | event_id | STRING |  |
 | order_id | STRING | -> orders |
-| status | STRING | placed | paid | shipped | delivered | cancelled | returned | refunded |
+| status | STRING | placed, paid, shipped, delivered, cancelled, returned, refunded |
 | event_ts_raw | STRING | mixed: '2020-11-14 09:12:33' and '2020-11-14T09:12:33+01:00' |
+| reason | STRING | NULL except on cancelled and returned. Cancelled: payment_failed, customer_request, out_of_stock, fraud_check. Returned: wrong_size, damaged, not_as_described, changed_mind (= returns.reason, copied onto the event) |
 | loaded_at | TIMESTAMP | 1-3 days late for ~10% of rows |
 
 ## customers  (one row per customer; ~90% seeded from purchasing user_pseudo_id)
@@ -105,8 +106,8 @@ The `items` extract keys on GA4 `item_id`, which is SKU grain (one id per size o
 | order_id | STRING | -> orders |
 | order_item_id | STRING | -> order_items; NULL = whole-order return |
 | requested_at | TIMESTAMP | within 30 days of delivery |
-| reason | STRING | wrong_size | damaged | not_as_described | changed_mind | other |
-| accepted |  BOOL | ~85% true; refused returns produce no status event or refund |
+| reason | STRING | wrong_size, damaged, not_as_described, changed_mind |
+| accepted | BOOL | ~85% true; refused returns produce no status event or refund |
 | loaded_at | TIMESTAMP |  |
 
 ## refunds  (one row per refund payment)
@@ -209,3 +210,6 @@ Foreign keys (orders→customers, order_items→orders/products, order_status_ev
 **About the A/B effect.** The lift is injected: 825 treatment users who never bought were given a backend-only (phone/app) order within 7 days of exposure, since GA4 purchase events cannot be generated. The readout in week 13 must therefore count conversions from `orders`, not from GA4 purchases, and the lift appearing only in non-web channels is a known tell that the effect is synthetic. Control conversion was left untouched (2.65% before, 2.66% after).
 
 **Monetary columns** are FLOAT64 in raw (the generator loads pandas floats); staging casts to NUMERIC.
+
+### Fixes
+- 2026-11-02: order_items.loaded_at added (= its order’s loaded_at); only order_items.csv hash changed, verified against the Week 4 run.

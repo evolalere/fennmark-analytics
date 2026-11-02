@@ -450,10 +450,13 @@ def build_order_items(ga4, orders, backend_lines, products):
     })
     oi = pd.concat([seeded, backend_lines], ignore_index=True)
 
+    # a line reaches raw with its order: same loaded_at, no extra randomness
+    oi["loaded_at"] = oi["order_id"].map(orders.set_index("order_id")["loaded_at"])
+
     assert oi["order_item_id"].is_unique
     assert oi["product_id"].isin(products["product_id"]).all(), "line with unknown product"
     assert orders["order_id"].isin(oi["order_id"]).all(), "order without lines"
-
+    assert oi["loaded_at"].notna().all(), "line without loaded_at"
     line_sum = oi.groupby("order_id")["line_revenue"].sum().round(2)
     gross = orders.set_index("order_id")["gross_revenue"].round(2)
     seeded_ids = orders.loc[orders["channel"] == "web", "order_id"]
@@ -505,6 +508,7 @@ def inject_order_problems(orders, customers, cfg, rng):
     assert orders["customer_id"].isin(customers["customer_id"]).all()
     assert customers["customer_id"].is_unique
     assert orders["order_id"].str.startswith("B-").eq(orders["channel"] != "web").all()
+    assert (orders["loaded_at"] >= orders["placed_at"]).all(), "order loaded before it was placed"
 
     # 3. mid-history schema change: two files, one table
     cut = pd.Timestamp("2021-01-01", tz="UTC")
@@ -739,9 +743,9 @@ SCHEMAS = {
     "customers": [F("customer_id", "STRING", "REQUIRED"), F("user_pseudo_id", "STRING"), F("full_name", "STRING"),
                   F("email", "STRING"), F("country", "STRING"), F("email_consent", "STRING"),
                   F("acquisition_date", "DATE"), F("created_at", "TIMESTAMP"), F("loaded_at", "TIMESTAMP")],
-    "products": [F("product_id", "STRING", "REQUIRED"), F("product_name", "STRING"), F("variant", "STRING"),
-                 F("category", "STRING"), F("list_price", "FLOAT64"), F("cost_price", "FLOAT64"),
-                 F("supplier", "STRING"), F("launch_date", "DATE"), F("loaded_at", "TIMESTAMP")],
+    "products":  [F("product_id", "STRING", "REQUIRED"), F("product_name", "STRING"), F("variant", "STRING"),
+                  F("category", "STRING"), F("list_price", "FLOAT64"), F("cost_price", "FLOAT64"),
+                  F("supplier", "STRING"), F("launch_date", "DATE"), F("loaded_at", "TIMESTAMP")],
     "orders_2020": [F("order_id", "STRING", "REQUIRED"), F("customer_id", "STRING"), F("placed_at", "TIMESTAMP"),
                     F("channel", "STRING"), F("payment_method", "STRING"), F("currency", "STRING"),
                     F("gross_revenue", "FLOAT64"), F("discount_amount", "FLOAT64"), F("ship_country", "STRING"),
@@ -751,7 +755,8 @@ SCHEMAS = {
                     F("gross_revenue", "FLOAT64"), F("discount_amount", "FLOAT64"), F("shipping_country", "STRING"),
                     F("loaded_at", "TIMESTAMP")],
     "order_items": [F("order_item_id", "STRING", "REQUIRED"), F("order_id", "STRING"), F("product_id", "STRING"),
-                    F("quantity", "INTEGER"), F("unit_price", "FLOAT64"), F("line_revenue", "FLOAT64")],
+                    F("quantity", "INTEGER"), F("unit_price", "FLOAT64"), F("line_revenue", "FLOAT64"),
+                    F("loaded_at", "TIMESTAMP")],
     "order_status_events": [F("event_id", "STRING", "REQUIRED"), F("order_id", "STRING"), F("status", "STRING"),
                             F("event_ts_raw", "STRING"), F("reason", "STRING"), F("loaded_at", "TIMESTAMP")],
     "returns": [F("return_id", "STRING", "REQUIRED"), F("order_id", "STRING"), F("order_item_id", "STRING"),
