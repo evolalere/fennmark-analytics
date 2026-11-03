@@ -15,3 +15,15 @@ snapshot-paths: ["snapshots"]
 clean-targets:
   - "target"
   - "dbt_packages"
+
+models:
+  fennmark:
+    staging:
+      +materialized: view
+      +schema: staging
+
+seeds:
+  fennmark:
+    +schema: seeds
+    product_category_overrides:
+      +column_types: {product_id: string, raw_category: string, category: string}
