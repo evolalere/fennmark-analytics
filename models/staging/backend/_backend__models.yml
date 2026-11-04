@@ -1,0 +1,94 @@
+version: 2
+
+models:
+  - name: stg_backend__orders
+    description: One row per order; country columns coalesced; money cast to NUMERIC; EUR rows flagged.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "gross_revenue >= discount_amount and discount_amount >= 0"
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_backend__customers')
+                field: customer_id
+              config:
+                severity: warn        # 7 expected failures until Week 7 stitching
+      - name: placed_at
+        data_tests: [not_null]
+      - name: shipping_country
+        description: Coalesced from ship_country (pre-2021) and shipping_country (2021+).
+        data_tests: [not_null]
+      - name: channel
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['web', 'app', 'phone']
+      - name: payment_method
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['card', 'paypal', 'invoice', 'giftcard']
+      - name: currency
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['USD', 'EUR']
+
+  - name: stg_backend__customers
+    description: >
+      One row per customer. Raw holds 73 duplicate rows (same cookie, later created_at);
+      staging keeps the earliest row per cookie. Partition key is coalesce(cookie, customer_id)
+      so backend-only customers (NULL cookie) are never collapsed into one.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: user_pseudo_id
+        description: GA4 cookie id; NULL for backend-only customers. Unique after dedup (NULLs ignored).
+        data_tests: [unique]
+      - name: has_email_consent
+        description: NULL means consent was never recorded; dim_customers treats NULL as not consented.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [true, false]
+                quote: false
+      - name: country
+        data_tests: [not_null]
+
+  - name: stg_backend__order_status_events
+    description: >
+      One row per status change; event_ts_raw (two string formats) parsed to event_at in UTC
+      via parse_mixed_timestamp. is_late_arriving flags rows loaded more than a day after the
+      event (~10%), for Week 9's incremental lookback.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(status in ('cancelled', 'returned')) = (reason is not null)"
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests: [not_null]
+      - name: event_at
+        description: Parsed from event_ts_raw; both raw formats resolve to one UTC instant.
+        data_tests: [not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['placed', 'paid', 'shipped', 'delivered', 'cancelled', 'returned', 'refunded']
+      - name: reason
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['payment_failed', 'customer_request', 'out_of_stock', 'fraud_check',
+                         'wrong_size', 'damaged', 'not_as_described', 'changed_mind']
+
+
+                         

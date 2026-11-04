@@ -1,0 +1,15 @@
+version: 2
+
+macros:
+  - name: parse_mixed_timestamp
+    description: >
+      Parses a STRING timestamp column that holds two formats into one UTC TIMESTAMP:
+      '2020-11-14 09:12:33' (naive, UTC) and '2020-11-14T10:12:33+01:00' (ISO 8601 with
+      offset; %Ez converts it to UTC). Each SAFE.PARSE_TIMESTAMP arm returns NULL for the
+      format it does not match, so coalesce picks the one that parsed. Returns NULL for any
+      third format, which stg_backend__order_status_events guards with a not_null test on
+      event_at. Used for order_status_events.event_ts_raw (domain_spec section 7).
+    arguments:
+      - name: column_name
+        type: string
+        description: Name of the STRING column to parse (passed unquoted, e.g. event_ts_raw).
