@@ -1,0 +1,31 @@
+version: 2
+
+seeds:
+  - name: product_category_overrides
+    description: >
+      Maps GA4 item_category values (navigation breadcrumbs, not a taxonomy) to Fennmark's
+      canonical product category. Two kinds of row: raw_category rows apply to every SKU
+      with that raw value; product_id rows apply to one SKU and win over raw_category rows.
+
+      Canonical categories: Apparel, Drinkware, Bags, Accessories, Stationery, Lifestyle,
+      Electronics, Gift Cards, Other.
+      
+      Rule for the list: a category is what the product IS, reported on by margin, one per
+      product. Rejected as categories: Men's / Women's / Kids (audience segments within
+      Apparel), New / Sale / Clearance (pricing or time states), Campus Collection /
+      Eco-Friendly (collections and attributes that cut across categories), Office (merged
+      into Stationery), Small Goods / Uncategorized Items (catch-all shop sections, mapped per
+      SKU). Gift Cards is kept because it has no cost of goods and no returns, which would
+      skew any category it was folded into.
+
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [product_id, raw_category]
+    columns:
+      - name: category
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Apparel', 'Drinkware', 'Bags', 'Accessories', 'Stationery', 'Lifestyle', 'Gift Cards', 'Other']

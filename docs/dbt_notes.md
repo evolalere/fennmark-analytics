@@ -52,5 +52,20 @@ Max `loaded_at` per table, run 2026-11-03:
 | order_status_events | 2021-03-06 16:09:35 | lifecycle tail |
 | returns | 2021-03-07 04:59:54 | lifecycle tail: up to 30 days after delivery |
 
+## How product_category_overrides was built
 
+Two passes against `fm_raw.products`:
 
+1. **By raw value.** `select category, count(*) from fm_raw.products group by 1 order by 2 desc`
+   gave 52 distinct values. The 29 that name a product type map by value (one row each,
+   product_id empty). The 15 navigation-style values (Campus Collection, Sale, New, Shop by Brand,
+   Eco-Friendly, Small Goods, Uncategorized Items, Lifestyle, Black Lives Matter, Fun, Google,
+   and their Home/ variants) plus NULL get no value row.
+2. **By SKU.** The 564 SKUs under those values were mapped from product_name by keyword
+   (tee/hoodie/jacket -> Apparel, bottle/mug/tumbler -> Drinkware, ...), one row each,
+   raw_category empty. Per-SKU rows win over value rows in stg_backend__products.
+
+To rebuild after a catalogue change: re-run the group-by and add value rows for any new product-type 
+value; then query the SKUs whose category is NULL or a navigation-style value (docs/ga4_queries.sql, fm03)
+and append a per-SKU row for every id not already in the seed.
+The health check is the share of 'Other' in stg_backend__products; 0 on the run.

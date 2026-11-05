@@ -271,3 +271,20 @@ FROM (
 WHERE unset_items > 0;
 -- result: 448 / 0
 
+-- fm01_product category problem
+SELECT category, 
+COUNT(*) 
+FROM fm_raw.products 
+GROUP BY 1 
+ORDER BY 2 DESC
+
+-- fm03_product category problem
+select product_id, product_name, category as raw_category
+from `fennmark-analytics.fm_raw.products`
+where category is null
+   or category in ('Home/Campus Collection/', 'Home/Sale/', 'Shop by Brand',
+                   'Home/Shop by Brand/Google/', 'Home/Shop by Brand/YouTube/',
+                   'Home/Shop by Brand/Android/', 'Home/Eco-Friendly/', 'Home/New/',
+                   'Lifestyle', 'Lifestyle/', 'Lifestyle/Small Goods/', 'Google',
+                   'Black Lives Matter', 'Home/Black Lives Matter/', 'Fun')
+order by category, product_name
