@@ -69,3 +69,9 @@ To rebuild after a catalogue change: re-run the group-by and add value rows for 
 value; then query the SKUs whose category is NULL or a navigation-style value (docs/ga4_queries.sql, fm03)
 and append a per-SKU row for every id not already in the seed.
 The health check is the share of 'Other' in stg_backend__products; 0 on the run.
+
+**Health check.** `stg_backend__products` falls back to 'Other' for any SKU the seed does not
+cover, so the share of Other measures how complete the seed is. Week 5 run (2026-11-06):
+0 of 1,231 SKUs. Distribution: Apparel 734, Stationery 134, Drinkware 123, Accessories 111,
+Bags 91, Lifestyle 30, Gift Cards 8. If a generator re-run or a catalogue change puts SKUs
+into Other, query `where category = 'Other'` on the staging view and add per-SKU rows for them.

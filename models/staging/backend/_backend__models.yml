@@ -90,5 +90,27 @@ models:
                 values: ['payment_failed', 'customer_request', 'out_of_stock', 'fraud_check',
                          'wrong_size', 'damaged', 'not_as_described', 'changed_mind']
 
+  - name: stg_backend__products
+    description: >
+      One row per SKU (GA4 item_id). raw_category is the GA4 breadcrumb as reported;
+      category is the canonical value from the product_category_overrides seed
+      (per-SKU row wins over raw-value row, 'Other' if neither matches). The only
+      staging model with a ref(), to that seed. 'Single Option Only' variant becomes NULL.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "list_price > 0 and cost_price < list_price"
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+      - name: product_name
+        data_tests: [not_null]
+      - name: category
+        description: Canonical category from the seed; 'Other' is the fallback and its share is the seed's health check.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Apparel', 'Drinkware', 'Bags', 'Accessories', 'Stationery', 'Lifestyle', 'Gift Cards', 'Other']
 
-                         
+
