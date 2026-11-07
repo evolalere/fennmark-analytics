@@ -143,7 +143,7 @@ The `items` extract keys on GA4 `item_id`, which is SKU grain (one id per size o
 | source | STRING | = GA4 traffic_source.source values (google, facebook, ...) |
 | medium | STRING | = GA4 traffic_source.medium (cpc, organic, referral, ...); spend is 0 for organic/referral/(none), > 0 for paid |
 | campaign | STRING | = GA4 traffic_source.name; '(not set)' allowed |
-| spend | NUMERIC | USD; scaled to daily session counts for that source/medium |
+| spend_usd | NUMERIC | USD; scaled to daily session counts for that source/medium |
 | loaded_at | TIMESTAMP |  |
 
 ## experiment_assignments  (one row per user × experiment; no natural key)
@@ -211,5 +211,31 @@ Foreign keys (orders→customers, order_items→orders/products, order_status_ev
 
 **Monetary columns** are FLOAT64 in raw (the generator loads pandas floats); staging casts to NUMERIC.
 
+### Problem ledger: handled in staging (week 5)
+
+Verified in BigQuery with `docs/staging_checks.sql` against the `stg_backend__` views after
+`dbt build` on 2026-11-07. Six of the ledger rows are resolved or flagged in staging; the rest
+(revenue gaps, backend-only and GA4-only orders, bad refunds, the injected A/B effect) pass
+through untouched for weeks 7, 9, 10 and 13.
+
+| Problem | Raw (week 4) | Staging (week 5) | Test that guards it |
+| --- | --- | --- | --- |
+| Duplicate customers | 73 extra rows | 0; 4,651 rows (earliest row per cookie kept) | `unique user_pseudo_id` on stg_backend__customers |
+| Mixed timestamp formats | 2,176 ISO+offset | 0 unparseable `event_at` | `not_null event_at` on stg_backend__order_status_events |
+| Late-arriving status events | 2,226 | 2,226 flagged `is_late_arriving`; handled in week 9 | — |
+| NULL consent | 711 | 705 as BOOL NULL (6 were on duplicate rows) | `accepted_values [true, false]` on has_email_consent |
+| Currency mismatch | 20 EUR | 20 flagged `has_currency_mismatch`; amounts untouched | `accepted_values currency` on stg_backend__orders |
+| Mid-history schema change | 4,263 ship_country / 1,195 shipping_country | one `shipping_country` column, 0 NULL | `not_null shipping_country` on stg_backend__orders |
+| Navigation labels as category | 52 raw values, 6 NULL | 7 canonical categories, 0 Other | `accepted_values category` on stg_backend__products |
+
+Row counts: every staging view equals its raw table except customers (4,724 raw, 4,651 staged).
+The 7 orders and 5 NPS surveys that point at a removed duplicate customer are reported by
+warn-severity `relationships` tests until week 7's customer stitching resolves them.
+
 ### Fixes
-- 2026-11-02: order_items.loaded_at added (= its order’s loaded_at); only order_items.csv hash changed, verified against the Week 4 run.
+
+- 2026-11-02: `order_items.loaded_at` was missing from the schema dict; added (= its order's
+  loaded_at). Only `order_items.csv` changed; verified by hash against the week 4 run.
+- 2026-11-02: `order_status_events.reason` was in the generator but not in this README; row added.
+- 2026-11-07: `marketing_spend.spend` is written as `spend_usd` by the generator; README and
+  `_backend__sources.yml` corrected to `spend_usd`.

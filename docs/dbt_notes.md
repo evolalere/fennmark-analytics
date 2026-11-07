@@ -1,27 +1,75 @@
 # dbt: exploration notes
 
-## Staging reconciliation targets 
+## Staging conventions (week 5)
+
+Decided once, applied to every `stg_` model:
+
+- **One source per model.** Every staging model selects from exactly one `{{ source() }}`: no
+  joins between sources, no `ref()` to another staging model, no business logic. The single
+  exception is `stg_backend__products`, which `ref()`s the `product_category_overrides` seed
+  (reference data, not a model).
+- **One row per key, or a surrogate.** Where raw has a natural key, staging guarantees it is
+  unique (customers are deduplicated). Where raw has none (marketing_spend, experiment_assignments),
+  staging builds one with `dbt_utils.generate_surrogate_key`. Every key carries `unique` + `not_null`.
+- **Types are fixed here, once.** FLOAT64 money -> NUMERIC; the consent STRING -> BOOL (NULL kept);
+  the two-format timestamp STRING -> TIMESTAMP in UTC via `parse_mixed_timestamp`. Downstream
+  models never cast.
+- **House naming.** snake_case; `_at` for timestamps, `_date` for dates, `is_` / `has_` for
+  booleans, `_amount` for money; ids keep their raw names.
+- **Fix where cheapest, prove with a test.** Each ledger row staging owns gets one expression and
+  one test that fails if the expression is removed. Problems that need another table or a business
+  decision are flagged (`has_currency_mismatch`, `is_late_arriving`), not fixed.
+- **Views.** Staging is `materialized: view` at the folder level; week 9 decides what becomes
+  incremental.
+- **Layout.** `with source as (...)`, `renamed as (...)`, `select * from renamed`; a `deduplicated`
+  CTE where needed. Lowercase keywords, four-space indent, aliases aligned. The marketing_spend
+  model names its first CTE `raw` because the table has a column called `source`.
+- **Tests at error severity by default.** `severity: warn` only where a failure is expected and
+  explained: the `relationships` tests from orders and nps_surveys to customers (7 and 5 rows that
+  point at removed duplicate customers, until week 7's stitching).
+
+## Staging reconciliation targets
+
 Expected row counts of each stg_backend__ view
 
-| Table | Raw | Staging expected |
-| --- | --- | --- |
-| customers | 4.724 | 4,651 (minus the 73 duplicates) |
-| experiment_assignments | 102.443 | identical |
-| marketing_spend | 917 | identical |
-| nps_surveys | 4.918 | identical |
-| order_items | 14.958 | identical |
-| order_status_events | 21.766 | identical |
-| orders | 5.458 | identical |
-| products | 1.231 | identical |
-| refunds | 456 | identical |
-| returns | 373 | identical |
+| Table | Raw | Staging expected | Staging actual (2026-11-07) |
+| --- | --- | --- | --- |
+| customers | 4,724 | 4,651 (minus the 73 duplicates) | 4,651 |
+| experiment_assignments | 102,443 | identical | 102,443 |
+| marketing_spend | 917 | identical | 917 |
+| nps_surveys | 4,918 | identical | 4,918 |
+| order_items | 14,958 | identical | 14,958 |
+| order_status_events | 21,766 | identical | 21,766 |
+| orders | 5,458 | identical | 5,458 |
+| products | 1,231 | identical | 1,231 |
+| refunds | 456 | identical | 456 |
+| returns | 373 | identical | 373 |
 
 Values obtained from raw tables
 ```sql
-SELECT table_id, row_count 
+SELECT table_id, row_count
 FROM fm_raw.__TABLES__
 ORDER BY table_id;
 ```
+
+## Staging checks (week 5)
+
+`docs/staging_checks.sql` holds the row-count query above (against the staging views) and the
+ledger query below. Run after `dbt build`; results on 2026-11-07:
+
+| Check | Expected | Actual |
+| --- | --- | --- |
+| duplicate customers by cookie, staging | 0 | 0 |
+| unparseable `event_at` | 0 | 0 |
+| late-arriving events flagged | 2,226 | 2,226 |
+| NULL `has_email_consent` | ~711 | 705 (6 of the 711 raw NULLs sat on duplicate rows removed by the dedup) |
+| `has_currency_mismatch` | 20 | 20 |
+| NULL `shipping_country` | 0 | 0 |
+| `category = 'Other'` | 0 | 0 |
+
+`dbt build` on the same day: 1 seed, 10 views, 82 tests; 91 pass, 2 warn (the relationships
+tests above: 7 and 5), 0 errors. The full ledger with the guarding test per row is in
+`generator/README.md`, section "Problem ledger: handled in staging".
 
 ## Source freshness
 
@@ -65,10 +113,9 @@ Two passes against `fm_raw.products`:
    (tee/hoodie/jacket -> Apparel, bottle/mug/tumbler -> Drinkware, ...), one row each,
    raw_category empty. Per-SKU rows win over value rows in stg_backend__products.
 
-To rebuild after a catalogue change: re-run the group-by and add value rows for any new product-type 
+To rebuild after a catalogue change: re-run the group-by and add value rows for any new product-type
 value; then query the SKUs whose category is NULL or a navigation-style value (docs/ga4_queries.sql, fm03)
 and append a per-SKU row for every id not already in the seed.
-The health check is the share of 'Other' in stg_backend__products; 0 on the run.
 
 **Health check.** `stg_backend__products` falls back to 'Other' for any SKU the seed does not
 cover, so the share of Other measures how complete the seed is. Week 5 run (2026-11-06):

@@ -2,15 +2,22 @@ version: 2
 
 models:
   - name: stg_backend__orders
-    description: One row per order; country columns coalesced; money cast to NUMERIC; EUR rows flagged.
+    description: >
+      One row per order. The two shipping-country columns from the 2021-01-01 rename are
+      coalesced into one; money is cast from FLOAT64 to NUMERIC; the 20 EUR rows are flagged,
+      not converted. No status column by design: status is derived from order_status_events.
     data_tests:
       - dbt_utils.expression_is_true:
           arguments:
             expression: "gross_revenue >= discount_amount and discount_amount >= 0"
     columns:
       - name: order_id
+        description: GA4 transaction_id for web orders; 'B-' + 6 digits for backend-only orders.
         data_tests: [unique, not_null]
       - name: customer_id
+        description: >
+          Customer at the time of the order. 7 orders point at a duplicate customer row that
+          staging removes; the warn-severity relationships test reports them until Week 7 stitching.
         data_tests:
           - not_null
           - relationships:
@@ -20,9 +27,10 @@ models:
               config:
                 severity: warn        # 7 expected failures until Week 7 stitching
       - name: placed_at
+        description: UTC. Equals the GA4 purchase event timestamp for web orders.
         data_tests: [not_null]
       - name: shipping_country
-        description: Coalesced from ship_country (pre-2021) and shipping_country (2021+).
+        description: ISO-2. Coalesced from ship_country (rows before 2021-01-01) and shipping_country (2021+).
         data_tests: [not_null]
       - name: channel
         data_tests:
@@ -35,48 +43,67 @@ models:
               arguments:
                 values: ['card', 'paypal', 'invoice', 'giftcard']
       - name: currency
+        description: USD except 20 deliberate EUR rows whose amounts are still USD; see has_currency_mismatch.
         data_tests:
           - accepted_values:
               arguments:
                 values: ['USD', 'EUR']
+      - name: gross_revenue
+        description: NUMERIC. Before discount; = GA4 purchase_revenue for web orders.
+      - name: discount_amount
+        description: NUMERIC. Applied after the GA4 event on ~15% of web orders; 0 on backend-only orders.
+      - name: net_revenue
+        description: gross_revenue - discount_amount. The backend's revenue figure; GA4 reports gross.
+      - name: is_backend_only
+        description: TRUE for 'B-' orders (phone, app) that GA4 never saw. Week 7 reconciliation bucket.
+      - name: has_currency_mismatch
+        description: TRUE for the 20 rows with currency != 'USD'. Flagged here, excluded or tested downstream (Week 10).
+      - name: loaded_at
+        description: When the row reached raw.
 
   - name: stg_backend__customers
     description: >
       One row per customer. Raw holds 73 duplicate rows (same cookie, later created_at);
       staging keeps the earliest row per cookie. Partition key is coalesce(cookie, customer_id)
-      so backend-only customers (NULL cookie) are never collapsed into one.
+      so backend-only customers (NULL cookie) are never collapsed into one. email_consent is
+      cast from STRING to BOOL; NULL stays NULL.
     columns:
       - name: customer_id
+        description: "'C-' + 6 digits."
         data_tests: [unique, not_null]
       - name: user_pseudo_id
         description: GA4 cookie id; NULL for backend-only customers. Unique after dedup (NULLs ignored).
         data_tests: [unique]
       - name: has_email_consent
-        description: NULL means consent was never recorded; dim_customers treats NULL as not consented.
+        description: BOOL from the raw 'true' / 'false' strings. NULL means consent was never recorded; dim_customers treats NULL as not consented.
         data_tests:
           - accepted_values:
               arguments:
                 values: [true, false]
                 quote: false
       - name: country
+        description: ISO-2.
         data_tests: [not_null]
+      - name: created_at
+        description: Account creation. The dedup keeps the row with the earliest created_at per cookie.
 
   - name: stg_backend__order_status_events
     description: >
       One row per status change; event_ts_raw (two string formats) parsed to event_at in UTC
-      via parse_mixed_timestamp. is_late_arriving flags rows loaded more than a day after the
-      event (~10%), for Week 9's incremental lookback.
+      via parse_mixed_timestamp and the raw string dropped. is_late_arriving flags rows loaded
+      more than a day after the event (~10%), for Week 9's incremental lookback.
     data_tests:
       - dbt_utils.expression_is_true:
           arguments:
             expression: "(status in ('cancelled', 'returned')) = (reason is not null)"
     columns:
       - name: event_id
+        description: "'E-' + 7 digits, numbered in (order_id, timestamp) order."
         data_tests: [unique, not_null]
       - name: order_id
         data_tests: [not_null]
       - name: event_at
-        description: Parsed from event_ts_raw; both raw formats resolve to one UTC instant.
+        description: Parsed from event_ts_raw; both raw formats ('YYYY-MM-DD HH:MM:SS' UTC and ISO 8601 with offset) resolve to one UTC instant.
         data_tests: [not_null]
       - name: status
         data_tests:
@@ -84,11 +111,18 @@ models:
               arguments:
                 values: ['placed', 'paid', 'shipped', 'delivered', 'cancelled', 'returned', 'refunded']
       - name: reason
+        description: >
+          NULL except on cancelled and returned events. Cancelled: payment_failed, customer_request,
+          out_of_stock, fraud_check. Returned: same value as returns.reason for that order.
         data_tests:
           - accepted_values:
               arguments:
                 values: ['payment_failed', 'customer_request', 'out_of_stock', 'fraud_check',
                          'wrong_size', 'damaged', 'not_as_described', 'changed_mind']
+      - name: is_late_arriving
+        description: TRUE when loaded_at is more than one day after event_at (~10% of rows, 2,226 on the Week 4 run).
+      - name: loaded_at
+        description: When the row reached raw; 1-3 days after the event for late-arriving rows.
 
   - name: stg_backend__products
     description: >
@@ -102,16 +136,30 @@ models:
             expression: "list_price > 0 and cost_price < list_price"
     columns:
       - name: product_id
+        description: = GA4 items.item_id, already one id per size or option.
         data_tests: [unique, not_null]
       - name: product_name
+        description: Most frequent non-empty item_name spelling per id.
         data_tests: [not_null]
+      - name: variant
+        description: Size or option. NULL where raw said 'Single Option Only' (non-sized merchandise).
+      - name: raw_category
+        description: item_category exactly as GA4 reported it (a navigation breadcrumb, not a taxonomy). Kept so the fix is visible.
       - name: category
-        description: Canonical category from the seed; 'Other' is the fallback and its share is the seed's health check.
+        description: Canonical category from the seed; 'Other' is the fallback and its share is the seed's health check (0 of 1,231 on the Week 5 run).
         data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ['Apparel', 'Drinkware', 'Bags', 'Accessories', 'Stationery', 'Lifestyle', 'Gift Cards', 'Other']
+      - name: list_price
+        description: NUMERIC. Reference selling price (modal GA4 price). The price charged is order_items.unit_price.
+      - name: cost_price
+        description: NUMERIC. 40-70% of list_price, band per category in generator/config.yml.
+      - name: supplier
+        description: One per category.
+      - name: launch_date
+        description: Before the product's first GA4 appearance.
 
   - name: stg_backend__order_items
     description: >
@@ -124,6 +172,7 @@ models:
             expression: "quantity > 0 and line_revenue >= 0 and unit_price >= 0"
     columns:
       - name: order_item_id
+        description: order_id + '-' + line number.
         data_tests: [unique, not_null]
       - name: order_id
         data_tests:
@@ -141,6 +190,14 @@ models:
                 field: product_id
       - name: quantity
         data_tests: [not_null]
+      - name: unit_price
+        description: NUMERIC. Price on this purchase (GA4 items.price), not products.list_price.
+      - name: line_revenue
+        description: NUMERIC. GA4 item_revenue, net of line discount; not always unit_price x quantity.
+      - name: gross_line_amount
+        description: NUMERIC. unit_price x quantity. The difference to line_revenue is a known reason GA4 and backend revenue differ (Week 7).
+      - name: loaded_at
+        description: = the order's loaded_at (a line arrives with its order).
 
   - name: stg_backend__returns
     description: >
@@ -148,6 +205,7 @@ models:
       produces no status event and no refund. order_item_id NULL means the whole order was returned.
     columns:
       - name: return_id
+        description: "'R-' + 6 digits."
         data_tests: [unique, not_null]
       - name: order_id
         data_tests:
@@ -170,22 +228,27 @@ models:
               arguments:
                 values: ['wrong_size', 'damaged', 'not_as_described', 'changed_mind']
       - name: accepted
+        description: BOOL. ~85% TRUE. Accepted returns produce a 'returned' status event and one refund.
         data_tests: [not_null]
+      - name: is_whole_order_return
+        description: TRUE when order_item_id is NULL (~40% of returns).
       - name: requested_at
-        data_tests: [not_null]    
+        description: Within 30 days of delivery.
+        data_tests: [not_null]
 
   - name: stg_backend__refunds
     description: >
       One row per refund payment. return_id NULL means a refund for a paid-then-cancelled order;
       otherwise the refund for an accepted return. 5 refunds reference an order still in 'shipped'
       with no return and no status event (deliberate; they pass through staging and are caught
-      by the singular test, not here).
+      by a Week 10 singular test, not here).
     data_tests:
       - dbt_utils.expression_is_true:
           arguments:
             expression: "refund_amount > 0"
     columns:
       - name: refund_id
+        description: "'RF-' + 6 digits."
         data_tests: [unique, not_null]
       - name: order_id
         data_tests:
@@ -195,22 +258,132 @@ models:
                 to: ref('stg_backend__orders')
                 field: order_id
       - name: return_id
+        description: NULL for cancellation refunds (and for the 5 deliberate bad refunds).
         data_tests:
           - relationships:
               arguments:
                 to: ref('stg_backend__returns')
                 field: return_id
       - name: refund_type
+        description: "'cancellation' when return_id is NULL, otherwise 'return'. Describes the row's shape; the Week 10 test decides whether a cancellation refund is legitimate."
         data_tests:
           - accepted_values:
               arguments:
                 values: ['cancellation', 'return']
+      - name: refund_amount
+        description: NUMERIC. Whole-order net value for cancellations, line value for item returns. Never exceeds the order value by construction (tested in Week 10).
       - name: currency
+        description: = orders.currency, so the EUR orders carry EUR here too.
         data_tests:
           - not_null
           - accepted_values:
               arguments:
                 values: ['USD', 'EUR']
       - name: refunded_at
+        description: 1-5 days after the return acceptance or cancellation.
         data_tests: [not_null]
-    
+
+  - name: stg_backend__nps_surveys
+    description: >
+      One row per survey sent, one per delivered order, 2-3 days after delivery. ~40% responded;
+      score is NULL exactly when responded_at is NULL. The promoter/passive/detractor banding is a
+      mart concern (fct_nps), not done here.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(responded_at is null) = (score is null)"
+    columns:
+      - name: survey_id
+        description: "'S-' + 6 digits."
+        data_tests: [unique, not_null]
+      - name: order_id
+        description: Delivered orders only.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_backend__orders')
+                field: order_id
+      - name: customer_id
+        description: 5 surveys point at a duplicate customer row that staging removes; warn until Week 7 stitching.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_backend__customers')
+                field: customer_id
+              config:
+                severity: warn        # same dedup consequence as orders.customer_id; Week 7 stitching
+      - name: score
+        description: 0-10; NULL when unanswered.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                max_value: 10
+      - name: has_responded
+        description: TRUE when responded_at is not NULL (~40%).
+      - name: sent_at
+        data_tests: [not_null]
+      - name: responded_at
+        description: NULL for ~60% of surveys (sent, no answer).
+
+  - name: stg_backend__marketing_spend
+    description: >
+      One row per day x source x medium x campaign (the README's "day x source x medium" is not
+      unique; campaign is part of the grain). Raw has no key, so a surrogate is built from the
+      four grain columns. spend_amount is 0 for unpaid mediums (organic, referral, (none), email, (not set)).
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "spend_amount >= 0"
+    columns:
+      - name: marketing_spend_id
+        description: Surrogate key, dbt_utils.generate_surrogate_key over spend_date, source, medium, campaign.
+        data_tests: [unique, not_null]
+      - name: spend_date
+        data_tests: [not_null]
+      - name: source
+        description: = GA4 traffic_source.source.
+        data_tests: [not_null]
+      - name: medium
+        description: = GA4 traffic_source.medium.
+        data_tests: [not_null]
+      - name: campaign
+        description: "= GA4 traffic_source.name; '(not set)' allowed."
+        data_tests: [not_null]
+      - name: spend_amount
+        description: NUMERIC USD, from raw spend_usd. 0 for unpaid mediums.
+      - name: is_paid
+        description: TRUE when spend_amount > 0 (~10% of rows).
+
+  - name: stg_backend__experiment_assignments
+    description: >
+      One row per user x experiment for promo_badge_v1: every GA4 user with at least one
+      view_promotion event, assigned 50/50 by seeded hash. The +1.5 pp treatment effect is
+      injected into backend-only orders (generator README); the Week 13 readout counts
+      conversions from orders, not GA4 purchases.
+    columns:
+      - name: experiment_assignment_id
+        description: Surrogate key over experiment_id and user_pseudo_id.
+        data_tests: [unique, not_null]
+      - name: experiment_id
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['promo_badge_v1']
+      - name: user_pseudo_id
+        description: GA4 cookie id. Most exposed users never bought, so no relationships test to customers.
+        data_tests: [not_null]
+      - name: variant
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['control', 'treatment']
+      - name: is_treatment
+        description: TRUE when variant = 'treatment'.
+      - name: assigned_at
+        description: = the user's first view_promotion event.
+        data_tests: [not_null]

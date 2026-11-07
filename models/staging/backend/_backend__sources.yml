@@ -362,7 +362,7 @@ sources:
           - name: campaign
             data_type: STRING
             description: "= GA4 traffic_source.name; '(not set)' allowed. Part of the grain."
-          - name: spend
+          - name: spend_usd
             data_type: FLOAT64
             description: USD; sessions x spend-per-session from config.yml with noise; 0 for unpaid mediums. FLOAT64 in raw, NUMERIC in staging.
           - name: loaded_at
