@@ -13,3 +13,20 @@ macros:
       - name: column_name
         type: string
         description: Name of the STRING column to parse (passed unquoted, e.g. event_ts_raw).
+
+  - name: ga4_event_param
+    description: >
+      Lifts one GA4 event_params key to a scalar column with a correlated subquery over
+      UNNEST(event_params), preserving one row per event (a cross-join UNNEST would
+      multiply rows). any_value() tolerates a key repeated on one event, which would
+      otherwise raise "Scalar subquery produced more than one element". Only valid inside
+      a select over the ga4.events source, because it reads the current row's
+      event_params. The only place UNNEST(event_params) is written in the project.
+      Usage: ga4_event_param('ga_session_id', 'int') as ga_session_id.
+    arguments:
+      - name: key
+        type: string
+        description: The event_params key, e.g. 'ga_session_id', 'page_location'.
+      - name: type
+        type: string
+        description: Which value field to read - 'string' (default), 'int', 'float' or 'double'.

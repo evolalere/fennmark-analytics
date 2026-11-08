@@ -113,7 +113,7 @@
 
 - `traffic_source.source`, `medium` and `name` (campaign) carry the literal value `(data deleted)` on part of the sessions: an artefact of Google's obfuscation of the public sample, not a tracking gap. Found in the Week 4 extract (sessions_by_source, 917 day × source/medium/campaign rows).
 - `traffic_source` in the GA4 export is the user's *first-touch* source, not the session's; fine for shaping generated spend, not for session-level attribution.
-- Decision: keep the rows (session counts are real), generate spend = 0 for them, and group `(data deleted)` with `(not set)` and `(none)` as "unattributed" in marts. Documented on the GA4 source in Week 5's sources.yml.
+- Decision: keep the rows (session counts are real), generate spend = 0 for them, and group `(data deleted)` with `(not set)` and `(none)` as "unattributed" in marts. Documented on the GA4 source in models/staging/ga4/_ga4__sources.yml (Week 6).
 - session_start-based count is 354,857 vs 360,129 distinct sessions across all events; ~1.5% of sessions have no session_start event in the window.
 - In Week 7, sessionisation should define a session from its first event of any name, not from session_start, or fct_sessions will be short by the same 1.5%.
 

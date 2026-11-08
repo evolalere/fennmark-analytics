@@ -16,6 +16,11 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+vars:
+  # GA4 public sample coverage. Mirrors generator/config.yml window:; keep in sync by hand.
+  ga4_start_date: '2020-11-01'
+  ga4_end_date: '2021-01-31'
+
 models:
   fennmark:
     staging:

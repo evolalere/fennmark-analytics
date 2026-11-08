@@ -1,3 +1,4 @@
+
 {% macro parse_mixed_timestamp(column_name) -%}
     coalesce(
         safe.parse_timestamp('%Y-%m-%d %H:%M:%S',     {{ column_name }}),  -- '2020-11-14 09:12:33'        (UTC, ~90%)

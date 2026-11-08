@@ -1,0 +1,78 @@
+version: 2
+
+sources:
+  - name: ga4
+    description: >
+      Google Analytics 4 BigQuery export of the Google Merchandise Store, published by
+      Google as an obfuscated public sample. Fennmark's web-behaviour source: GA4 sees
+      what happened on the site; the backend (source: backend) is the system of record.
+      Window 2020-11-01..2021-01-31 (vars ga4_start_date / ga4_end_date), 92 daily shards,
+      4,295,584 events, 270,154 pseudo-users. Static and public: no freshness, no loaded_at.
+      Obfuscation artefacts (docs/ga4_notes.md): user_id is never populated; geo.city is
+      '(not set)' for ~42% of users; traffic_source.* carries the literal '(data deleted)'
+      on part of the sessions and is the user's FIRST-TOUCH source, not the session's.
+    database: bigquery-public-data
+    schema: ga4_obfuscated_sample_ecommerce
+    tables:
+      - name: events
+        identifier: events_*
+        description: >
+          One row per event, sharded by day (events_YYYYMMDD). No primary key: staging
+          builds a surrogate (stg_ga4__events.event_key). event_date is the property's
+          reporting-timezone date as a STRING (YYYYMMDD); event_timestamp is UTC
+          microseconds; the two disagree around midnight and neither is corrected.
+          Every model that reads this table filters _TABLE_SUFFIX to the project window
+          (vars ga4_start_date / ga4_end_date); nothing reads events_* unfiltered.
+        columns:
+          - name: event_date
+            description: Reporting-timezone date, STRING YYYYMMDD. Cast to DATE in staging.
+          - name: event_timestamp
+            description: UTC event time in microseconds, INT64. Cast to TIMESTAMP in staging.
+          - name: event_name
+            description: >
+              Event type: page_view, user_engagement, scroll, view_item, session_start,
+              first_visit, view_promotion, add_to_cart, begin_checkout, select_item,
+              view_search_results, add_shipping_info, add_payment_info, select_promotion,
+              purchase, click, view_item_list.
+          - name: user_pseudo_id
+            description: Per-browser cookie id; the only user key available. Stitched to customers in Week 7.
+          - name: user_id
+            description: Never populated in this sample (0%). Not staged.
+          - name: user_first_touch_timestamp
+            description: NULL on ~2% of events (4,435 users); advisory only. Week 7 derives first-seen as min(event_timestamp).
+          - name: event_params
+            description: >
+              REPEATED RECORD of key + value{string_value, int_value, float_value,
+              double_value}. Read with the ga4_event_param macro (correlated subquery, one
+              row per event preserved). Keys kept: ga_session_id, ga_session_number,
+              page_location, page_referrer, page_title, engagement_time_msec,
+              session_engaged, transaction_id, currency, campaign.
+          - name: items
+            description: >
+              REPEATED RECORD with fixed fields (item_id, item_name, item_variant,
+              item_category, price, quantity, item_revenue). Read with UNNEST(items) in
+              stg_ga4__purchase_items only. 448 purchase events carry a single '(not set)'
+              placeholder item with NULL price, never mixed with real lines. item_category
+              is a navigation breadcrumb, not a taxonomy; item_variant 'Single Option Only'
+              is the sentinel for non-sized merchandise. item_revenue is net of discounts
+              and rounding and is not always price x quantity.
+          - name: ecommerce
+            description: >
+              RECORD populated on purchase events: transaction_id ('(not set)' for ~15.5%
+              of purchases, 883 events incl. the 448 placeholders), purchase_revenue,
+              purchase_revenue_in_usd, shipping_value, tax_value, total_item_quantity,
+              unique_items. Duplicate purchase events per transaction_id exist (~324,
+              mostly November). GA4 money is indicative; the backend is the source of truth.
+          - name: device
+            description: RECORD; category, operating_system and web_info.browser are staged. Session-level attributes (~1.6% of users span device types).
+          - name: geo
+            description: RECORD; country is staged. city is '(not set)' for ~42% of users and is not staged.
+          - name: traffic_source
+            description: >
+              RECORD (source, medium, name). The user's first-touch acquisition source, not
+              the session's; staged as first_touch_*. '(data deleted)' is an obfuscation
+              artefact; marts group it with '(not set)' and '(none)' as unattributed.
+          - name: user_properties
+            description: REPEATED RECORD; no planned use. Not staged.
+          - name: privacy_info
+            description: RECORD; no planned use. Not staged.
