@@ -119,7 +119,7 @@
 
 ## Decisions for week 3 and beyond
 - stg_ga4__purchases: coalesce the two id sources, drop (not set)/NULL into a flagged “unidentified purchase” bucket, deduplicate real ids to first event. (See known data problems above and saved queries below for purchases.)
-- Generator seeds orders from the ~4,460 real ids. The 883 unidentified purchases are the realistic “GA4 saw a purchase but can’t tell us which order” category in Week 7’s reconciliation; no need to invent a further 5% of failed payments on top, the data already provides it.
+- Generator seeds orders from the ~4,460 real ids. The 906 unidentified purchases are the realistic “GA4 saw a purchase but can’t tell us which order” category in Week 7’s reconciliation; no need to invent a further 5% of failed payments on top, the data already provides it.
 - The backend orders table, not GA4, is the source of truth for revenue
 - GA4 revenue is whatever the customer’s browser reported at the moment of checkout, and that number is unreliable due to the known data problems above under purchase: Duplicate purchase events double-count (November especially), 15.5% of purchases have no id to attribute it to, ad blockers and closed tabs mean some orders never fire the event at all, and nothing that happens afterwards (cancellations, returns, refunds, failed payments) ever reaches GA4. 
 - The order system records the money that actually moved, with its later corrections, so finance-grade metrics (revenue, margin, refund rate) come from orders, and GA4 is used for what it’s good at: how people got there and what they did before buying.
@@ -127,7 +127,7 @@
 
 ## Open questions for week 3
 1. Customers: how does the generator assign customer_id to user_pseudo_id, given user_id is never populated? One customer per pseudo-id, or merge some pseudo-ids into one customer to simulate multi-device users (~1.6% of users already span device types)?
-2. Orders: which purchases become backend orders — only the ~4,460 with a real transaction_id, or also some of the 883 "(not set)" ones (with no GA4 link)?
+2. Orders: which purchases become backend orders — only the ~4,460 with a real transaction_id, or also some of the 906 "(not set)" ones (with no GA4 link)?
 3. Orders GA4 never saw: what share (phone, app, ad-blocked) and how are they marked?
 4. Order id before mid-November: GA4 ids only start part-way through the month; does the backend have orders before that date, and if so how are they keyed?
 5. Revenue: backend price = GA4 item price, or generated independently so the two never fully reconcile? Which currency, and do a few orders get a deliberate mismatch?

@@ -59,7 +59,7 @@ sources:
           - name: ecommerce
             description: >
               RECORD populated on purchase events: transaction_id ('(not set)' for ~15.5%
-              of purchases, 883 events incl. the 448 placeholders), purchase_revenue,
+              of purchases, 906 events: 883 ‘(not set)’ + 23 NULL, incl. the 448 placeholders), purchase_revenue,
               purchase_revenue_in_usd, shipping_value, tax_value, total_item_quantity,
               unique_items. Duplicate purchase events per transaction_id exist (~324,
               mostly November). GA4 money is indicative; the backend is the source of truth.

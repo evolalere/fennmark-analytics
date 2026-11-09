@@ -1,0 +1,109 @@
+version: 2
+
+models:
+  - name: stg_ga4__events
+    description: >
+      One row per GA4 event in the project window; nothing dropped (4,295,584 rows,
+      equal to raw). Materialized as a table partitioned by event_date and clustered by
+      event_name, user_pseudo_id: the one staging model that is not a view, because a view
+      over 92 wildcard shards would re-scan the sample on every downstream query and test
+      (docs/dbt_notes.md). A full build reads ~2.05 GB. event_params are lifted to columns
+      with ga4_event_param; items are not here, see stg_ga4__purchase_items. Not staged:
+      user_id (never populated), geo.city (42% '(not set)'), user_properties, privacy_info,
+      user_ltv, app_info, event_dimensions.
+    columns:
+      - name: event_key
+        description: >
+          Surrogate over user_pseudo_id, event_timestamp, event_name,
+          event_bundle_sequence_id, ga_session_id, engagement_time_msec, page_location.
+          Verified unique on raw (week 6 check q1): no tiebreaker needed.
+        data_tests: [unique, not_null]
+      - name: session_key
+        description: >
+          Surrogate over user_pseudo_id + ga_session_id; 360,129 distinct, the Week 7
+          sessionisation grain. Never NULL on this sample.
+        data_tests: [not_null]
+      - name: user_pseudo_id
+        description: Per-browser cookie id; the only user key. Stitched to customers in Week 7.
+        data_tests: [not_null]
+      - name: ga_session_id
+        description: From event_params; session id scoped to a user_pseudo_id, not globally unique.
+      - name: ga_session_number
+        description: From event_params; 1 on a user's first session.
+      - name: event_name
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['page_view', 'user_engagement', 'scroll', 'view_item', 'session_start',
+                         'first_visit', 'view_promotion', 'add_to_cart', 'begin_checkout',
+                         'select_item', 'view_search_results', 'add_shipping_info',
+                         'add_payment_info', 'select_promotion', 'purchase', 'click',
+                         'view_item_list']
+      - name: event_date
+        description: >
+          GA4 reporting-timezone date, parsed from STRING YYYYMMDD. Use for daily counts
+          that match the GA4 UI and the Week 2 numbers. Partition column.
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: "date('{{ var('ga4_start_date') }}')"
+                max_value: "date('{{ var('ga4_end_date') }}')"
+      - name: event_at
+        description: >
+          UTC instant from event_timestamp. Disagrees with event_date around midnight;
+          neither is corrected.
+        data_tests: [not_null]
+      - name: user_first_touch_at
+        description: NULL on ~2% of events; advisory. Week 7 derives first-seen as min(event_at) per user.
+      - name: event_bundle_sequence_id
+        description: GA4 upload batch id; part of event_key.
+      - name: platform
+        description: WEB for every row in this sample.
+      - name: page_location
+        description: From event_params; full URL of the page.
+      - name: page_referrer
+        description: From event_params.
+      - name: page_title
+        description: From event_params.
+      - name: engagement_time_msec
+        description: From event_params; milliseconds engaged, populated mainly on user_engagement.
+      - name: is_session_engaged
+        description: event_params session_engaged '1'/'0' cast to BOOL; NULL where the param is absent.
+      - name: transaction_id
+        description: >
+          coalesce of ecommerce.transaction_id and the transaction_id event param, with
+          '(not set)' nulled. NULL on every non-purchase event and on the 906 unidentified
+          purchase events (883 '(not set)' + 23 NULL in raw; 448 of them are the empty
+          placeholders). Populated on 4,786 purchase events, duplicates included. Week 7
+          counts the GA4-only bucket from here.
+      - name: purchase_revenue
+        description: >
+          ecommerce.purchase_revenue as reported by the browser, NUMERIC. Indicative;
+          the backend orders table is the source of truth for revenue (docs/ga4_notes.md).
+      - name: currency
+        description: From event_params; populated on ecommerce events.
+      - name: event_campaign
+        description: From event_params 'campaign'; event-level, distinct from first_touch_campaign.
+      - name: device_category
+        description: desktop, mobile or tablet. Session-level attribute (~1.6% of users span device types).      
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['desktop', 'mobile', 'tablet']
+      - name: device_os
+        description: device.operating_system.
+      - name: browser
+        description: device.web_info.browser.
+      - name: country
+        description: geo.country; fully populated. geo.city is not staged (42% '(not set)').
+      - name: first_touch_source
+        description: >
+          traffic_source.source, the user's first-touch source (not the session's).
+          '(data deleted)' is an obfuscation artefact, passed through; marts group it with
+          '(not set)' and '(none)' as unattributed.
+      - name: first_touch_medium
+        description: traffic_source.medium; same caveats as first_touch_source.
+      - name: first_touch_campaign
+        description: traffic_source.name; same caveats as first_touch_source.
