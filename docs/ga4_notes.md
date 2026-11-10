@@ -53,7 +53,7 @@
 ### Unnesting (q7, q7b)
 - Cross-join UNNEST (q7) multiplies rows, one per parameter; 
 - Correlated subquery (q7b) keeps one row per event. 
-- Week 6 will use the second.
+- Week 6 used the second, as the ga4_event_param macro.
 ### Items (q8, q8b, q8c)
 - `items` is a top-level REPEATED column with fixed fields (item_name, item_category, price, quantity, item_revenue), separate from `event_params`; read with UNNEST(items).
 - 396 distinct products bought across the period; 422 viewed. `(not set)` item names are negligible (9 item rows on view_item).
@@ -103,6 +103,7 @@
 
 ### Purchase
 - ids start mid-November; duplicates mostly November; 15.5% (not set).
+- 906 unidentified (883 (not set) + 23 NULL ecommerce.transaction_id; the Week 2 count missed the NULLs)
 
 ### Items
 - item_category is a breadcrumb path, not a category; canonical category must come from the backend.

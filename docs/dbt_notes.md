@@ -27,6 +27,19 @@ Decided once, applied to every `stg_` model:
 - **Tests at error severity by default.** `severity: warn` only where a failure is expected and
   explained: the `relationships` tests from orders and nps_surveys to customers (7 and 5 rows that
   point at removed duplicate customers, until week 7's stitching).
+- **Week 6 addenda (GA4).** (1) Views, with one exception: `stg_ga4__events` is a table
+  partitioned by `event_date` and clustered by `event_name, user_pseudo_id`, because a view
+  over 92 wildcard shards would re-scan the sample (~2 GB) on every downstream query and
+  test; the deviation is set in the model's `config()` where it is visible. (2) Every GA4
+  model filters `_table_suffix` from `ga4_start_date` / `ga4_end_date` in
+  `dbt_project.yml`; nothing reads `events_*` unfiltered. (3) `ga4_event_param` is the
+  only place `UNNEST(event_params)` is written. (4) Keys may be built in staging
+  (`event_key`, `session_key`, `purchase_item_key`); sessionising and joining may not.
+  (5) `stg_ga4__purchase_items` repeats the `stg_ga4__purchases` dedup CTEs rather than
+  `ref()` them: one source per staging model holds. The `relationships` test between the
+  two is a test, not a model dependency. (6) Row filters in staging are exclusions with a
+  counted reason only: the 906 unidentified purchase events are excluded from the two
+  purchase models and counted in *Staging checks (GA4)*; `stg_ga4__events` excludes nothing.
 
 ## Staging reconciliation targets
 
@@ -70,6 +83,42 @@ ledger query below. Run after `dbt build`; results on 2026-11-07:
 `dbt build` on the same day: 1 seed, 10 views, 82 tests; 91 pass, 2 warn (the relationships
 tests above: 7 and 5), 0 errors. The full ledger with the guarding test per row is in
 `generator/README.md`, section "Problem ledger: handled in staging".
+
+## Staging checks (GA4, week 6)
+
+Queries in `docs/staging_checks.sql`, GA4 section. Run 2026-11-10 against `dbt_dev_staging`
+after a green `dbt build` (13 staging models, 1 seed, 111 tests; the only warns are the
+two Week 5 `relationships` warns, 7 and 5 rows, cleared by Week 7's stitching).
+
+| # | Check | Expected (Week 2 / issue) | Actual | Note |
+| --- | --- | --- | --- | --- |
+| q1 | Candidate event key unique on raw | 4,295,584 = 4,295,584 | 4,295,584 = 4,295,584 | Seven columns are a true key; no tiebreaker |
+| q2 | stg_ga4__events rows, by month | 4,295,584 | 4,295,584 total; Nov 2020 1,472,712 / Dec 2020 1,612,725 / Jan 2021 1,210,147 | Nothing dropped |
+| q3 | Sessions by session_key vs session_start events | 360,129 vs 354,857 | 360,129 vs 354,970 | Week 2 counted 354,857 (113 fewer; likely a different suffix bound or count form in ga4_queries.sql q3). Gap to the key count is ~1.4% either way; Week 7 sessionises on the key, not on session_start |
+| q4 | Purchase events: identified + unidentified | ~4,784 + 883 | 4,786 + 906 = 5,692 | 906 = 883 '(not set)' + 23 NULL; Week 2 missed the NULLs |
+| q5 | Placeholder events (NULL revenue, no id) | 448 | 448 | Sub-bucket "GA4 purchase with no order data" |
+| q6 | Transactions after dedup; duplicate events | ~4,451; ~324 | 4,451; 335 on 326 transactions | First event wins |
+| q6b | Duplicates agree on revenue? | — | 311 agree, 15 disagree | Small ambiguity GA4 cannot resolve; backend has the real figure |
+| q7 | Lines; GA4 header revenue = sum of net lines? | 13,218 | 13,218 lines; quantity matches on 4,451/4,451; header = lines on 3,618 (81%); differs on 833 (447 above, 386 below), not explained by shipping + tax | GA4 disagrees with itself on revenue before any backend comparison |
+| q8 | Lines where gross != net; net > gross | — | 1,072 (8.1%); 495 | item_revenue is not price x quantity; known reconciliation reason |
+| q8 | Single-option lines; blank breadcrumb lines | — | 8,338; 204 | item_variant NULLed; raw_item_category is found-via only |
+| q9 | Bytes processed per model, last build | events: low GB | events 2.05 GB (~15 s, table build); purchases 1.61 GB; purchase_items 1.65 GB (views: per query, taken from each model's `unique` test) | Console estimate for events was 2.35 GB; the model reads named sub-fields only. The views cost ~1.6 GB per query because the event_name filter cuts rows, not scanned bytes; a Week 9 argument for making them tables too |
+
+Bytes per node (tables from the model row, views from their `unique` test):
+
+```bash
+python3 - <<'EOF'
+import json
+for r in json.load(open('target/run_results.json'))['results']:
+    b = (r.get('adapter_response') or {}).get('bytes_processed')
+    if b and 'ga4' in r['unique_id']:
+        print(r['unique_id'].split('.')[-1][:60], round(b / 1e9, 2), 'GB')
+EOF
+```
+
+Numbers that replace earlier estimates from here on: **906** unidentified purchase events
+(not 883), **4,451** transactions, **335** duplicate events on **326** transactions,
+**354,970** session_start events (not 354,857).
 
 ## Source freshness
 

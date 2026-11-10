@@ -4,8 +4,8 @@ End-to-end analytics for a direct-to-consumer merchandise and apparel brand: Goo
 e-commerce sample joined to a generated, deliberately messy order backend, modelled with dbt on
 BigQuery, tested, and reconciled source against source.
 
-**Status:** Phase 2, week 5 of 16 — raw backend staged and tested; `dbt build` green
-(1 seed, 10 models, 82 tests). Next: GA4 staging (week 6), reconciliation (week 7), marts (week 8).
+**Status:** Phase 2, week 6 of 16: backend and GA4 staged and tested; dbt build green.
+(1 seed, 13 models). Next: Reconciliation (week 7), marts (week 8).
 
 **Stack:** BigQuery, dbt 1.12, Python (pandas, Faker), GitHub Actions, Tableau Public
 

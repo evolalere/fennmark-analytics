@@ -3,6 +3,29 @@
 A short log of design decisions that changed the project's direction. One entry per decision:
 context, decision, consequence. Newest at the top.
 
+## 2026-11-10 · GA4 staging keeps every event, models only identified purchases, and is the one table in the staging layer (week 6)
+
+**Context.** The GA4 export has no primary key, 906 purchase events with no usable
+transaction id (883 `(not set)`, 23 NULL; 448 of them empty placeholders), 335 duplicate
+purchase events on 326 transactions, and 4.3 M rows across 92 daily shards in a public
+project, behind a 100 GiB/day quota. GA4 also disagrees with itself on money: header
+revenue differs from the sum of line revenue on 833 of 4,451 transactions, and
+`item_revenue` is not `price × quantity` on 1,072 lines.
+
+**Decision.** `stg_ga4__events` stages every raw event once (4,295,584 = raw) with a
+surrogate `event_key` verified unique on seven columns, as a partitioned, clustered table
+against the folder-level view rule. Purchases are modelled only where a transaction id
+exists, deduplicated to the first event, with the duplicate count kept as a column; the
+unidentified events stay in `stg_ga4__events` with a NULL id. Both GA4 line revenues are
+exposed (`gross_line_amount`, `net_line_amount`) under the same names as the backend's;
+staging picks neither. Header `purchase_revenue` is kept as reported.
+
+**Consequence.** Week 7 reads the GA4-only bucket from `stg_ga4__events` rather than a
+filter it has to reinvent, and inherits a documented, measured list of reasons GA4 and
+the backend will not reconcile: duplicates, unidentified purchases, header-vs-lines
+disagreement, net-vs-gross lines, plus the generated discounts. Week 9's incremental
+model inherits the partition. Every exclusion has a count in `docs/staging_checks.sql`.
+
 ## 2026-11-07 · Staging fixes what it can and flags what it cannot (week 5)
 
 **Context.** Six of the planned data problems (`domain_spec.md` section 7) are assigned to staging. Some have a correct answer at row level; others need another table or a business decision to resolve.
