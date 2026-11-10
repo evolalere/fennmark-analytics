@@ -107,3 +107,120 @@ models:
         description: traffic_source.medium; same caveats as first_touch_source.
       - name: first_touch_campaign
         description: traffic_source.name; same caveats as first_touch_source.
+
+  - name: stg_ga4__purchases
+    description: >
+      One row per identified GA4 purchase: transaction_id present after '(not set)' and
+      NULL are removed, deduplicated to the first purchase event by event_timestamp.
+      4,451 rows from 4,786 identified purchase events; purchase_event_count keeps the
+      335 duplicate events (on 326 transactions) visible. 311 of the 326 agree on revenue
+      across their events, 15 do not; the first event is kept because it is the one the
+      checkout fired. The 906 unidentified purchase events (883 '(not set)' + 23 NULL, 448
+      of them empty placeholders) are excluded here and counted from stg_ga4__events.
+      GA4 money is indicative; the backend orders table is the source of truth.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "purchase_event_count >= 1"
+    columns:
+      - name: transaction_id
+        description: >
+          GA4 ecommerce.transaction_id (or the transaction_id event param) = backend
+          orders.order_id for web orders; Week 7 joins on it.
+        data_tests: [unique, not_null]
+      - name: user_pseudo_id
+        data_tests: [not_null]
+      - name: session_key
+        description: Surrogate over user_pseudo_id + ga_session_id, same definition as stg_ga4__events.
+      - name: purchase_date
+        description: GA4 reporting-timezone date of the first purchase event.
+        data_tests: [not_null]
+      - name: purchased_at
+        description: UTC instant of the first purchase event.
+        data_tests: [not_null]
+      - name: purchase_revenue
+        description: ecommerce.purchase_revenue as the browser reported it at checkout. Compared in Week 7, never trusted.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: purchase_revenue_in_usd
+        description: ecommerce.purchase_revenue_in_usd; equals purchase_revenue where currency is USD.
+      - name: shipping_amount
+        description: ecommerce.shipping_value.
+      - name: tax_amount
+        description: ecommerce.tax_value.
+      - name: total_item_quantity
+        description: ecommerce.total_item_quantity as reported; compare with sum(quantity) on stg_ga4__purchase_items.
+      - name: unique_items
+        description: ecommerce.unique_items as reported.
+      - name: currency
+        description: From event_params.
+      - name: device_category
+        description: Device of the purchase event.
+      - name: country
+        description: geo.country of the purchase event.
+      - name: purchase_event_count
+        description: Purchase events GA4 fired for this transaction; 1 for 4,125 transactions, > 1 for 326.
+      - name: has_duplicate_events
+        description: purchase_event_count > 1.
+
+  - name: stg_ga4__purchase_items
+    description: >
+      One row per item line (array position) on an identified, deduplicated GA4 purchase:
+      13,218 lines over 4,451 transactions. gross_line_amount = price x quantity;
+      net_line_amount = GA4 item_revenue, which is not a function of price x quantity on
+      this sample: 1,072 lines (8.1%) differ, 495 of them with net above gross. That gap
+      is a known reason GA4 and backend revenue do not reconcile exactly (Week 7).
+      Placeholder lines ('(not set)' item, NULL price) are excluded. raw_item_category is
+      the navigation breadcrumb the item was found through, not a product category; the
+      canonical category is the backend's (stg_backend__products). Repeats the
+      stg_ga4__purchases dedup rather than ref() it: one source per staging model.
+    columns:
+      - name: purchase_item_key
+        description: Surrogate over transaction_id + line_number.
+        data_tests: [unique, not_null]
+      - name: transaction_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_ga4__purchases')
+                field: transaction_id
+      - name: line_number
+        description: 1-based position in the GA4 items array; stable within an event.
+        data_tests: [not_null]
+      - name: item_id
+        description: GA4 item_id = backend products.product_id (SKU grain, one id per size).
+        data_tests: [not_null]
+      - name: user_pseudo_id
+        data_tests: [not_null]
+      - name: item_name
+        description: Name as GA4 reported it on this purchase; the catalogue name is the backend's.
+      - name: item_variant
+        description: Size or colour; NULL where GA4 reported 'Single Option Only' (8,338 lines, non-sized merchandise).
+      - name: raw_item_category
+        description: Navigation breadcrumb (Home/Apparel/..., New, Shop by Brand, blank on 204 lines). Found-via attribute only.
+      - name: unit_price
+        description: GA4 items.price on this purchase, NUMERIC. The per-order price point; list price is the backend's.
+        data_tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+      - name: quantity
+        data_tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 1
+                inclusive: true
+      - name: gross_line_amount
+        description: unit_price x quantity, NUMERIC.
+        data_tests: [not_null]
+      - name: net_line_amount
+        description: GA4 items.item_revenue, NUMERIC; discounts and rounding applied by GA4.
+        data_tests: [not_null]
+      - name: purchased_at
+        description: UTC instant of the purchase event the line belongs to.
