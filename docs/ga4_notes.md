@@ -116,6 +116,19 @@
 - `traffic_source` in the GA4 export is the user's *first-touch* source, not the session's; fine for shaping generated spend, not for session-level attribution.
 - Decision: keep the rows (session counts are real), generate spend = 0 for them, and group `(data deleted)` with `(not set)` and `(none)` as "unattributed" in marts. Documented on the GA4 source in models/staging/ga4/_ga4__sources.yml (Week 6).
 - session_start-based count is 354,857 vs 360,129 distinct sessions across all events; ~1.5% of sessions have no session_start event in the window.
+
+**Sessions vs session_start events (resolved in week 7).** Three numbers describe sessions in the
+sample, and they measure different things:
+
+- 360,129 sessions: distinct `user_pseudo_id` + `ga_session_id`. Every event has a session id.
+- 354,857 sessions that contain a `session_start` event. The other 5,272 (1.5%) have none.
+- - 354,970 `session_start` events. 113 more than the sessions that have one, because 105 sessions fired the event more than once (99 twice, 4 three times, 2 four times).
+
+Week 2 reported 354,857 (it counted sessions) and week 6 reported 354,970 (it counted events); both
+were right. Neither is the session count. `int_ga4__sessions` therefore defines a session by its
+events, grouped on `session_key`, and exposes `has_session_start_event` so the 5,272 stay visible.
+Counting `session_start` events would undercount sessions by 1.4% and count 113 of them twice.
+
 - In Week 7, sessionisation should define a session from its first event of any name, not from session_start, or fct_sessions will be short by the same 1.5%.
 
 ## Decisions for week 3 and beyond

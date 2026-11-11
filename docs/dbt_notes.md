@@ -120,6 +120,29 @@ Numbers that replace earlier estimates from here on: **906** unidentified purcha
 (not 883), **4,451** transactions, **335** duplicate events on **326** transactions,
 **354,970** session_start events (not 354,857).
 
+## Intermediate checks (week 7)
+
+| # | Check | Expected | Actual | Note |
+| --- | --- | --- | --- | --- |
+| i1 | Events; events without a session id | 4,295,584; unknown | 4,295,584; 0 | Filter is a guard only; nothing excluded |
+| i1 | Sessions by key vs session_start events | 360,129 vs 354,970 | 360,129 vs 354,970 | 5,159 sessions have no session_start |
+| i1b | Sessions on two event dates | unknown | 845 (0.23%) | Session keeps its start date; Week 9 lookback must cover them |
+| i2 | Sessions without a session_start event | about 5,159 (360,129 − 354,970) | 5,272 (1.5%) | The subtraction assumed one session_start per session. 354,857 sessions have one (360,129 − 5,272) and they carry 354,970 session_start events, so 113 events are duplicates. This is the 113 gap between Week 2 (354,857, sessions counted) and Week 6 (354,970, events counted). |
+
+- int_ga4__sessions: 360.1k rows, 904.4 MiB processed per full build (table).
+- int_ga4__sessions
+
+| Figure | Value | Reading |
+| --- | --- | --- |
+| Sessions; events in sessions | 360,129; 4,295,584 | Exact; nothing dropped |
+| Without session_start	 | 5,272 (1.5%) | 113 duplicate session_start events account for the difference from 5,159 |
+| Engaged | 241,932 (67.2%)	 |  |
+| With a purchase event | 4,848 |  |
+| With an identified purchase | 4,044 | The 4,451 transactions sit in 4,044 sessions, so some sessions hold more than one |
+| Purchase events all unidentified | 804 (4,848 − 4,044) | Consistent with the 906 unidentified events |
+| Zero duration | 58,370 (16.2%)	 | One-event sessions, or all events at the same instant |
+| Median duration | 13 s | approx_quantiles is approximate; treat as “about 13 s” |
+
 ## Source freshness
 
 Thresholds in `models/staging/backend/_backend__sources.yml` follow each feed's real cadence,

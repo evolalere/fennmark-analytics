@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: int_ga4__sessions
+    description: >
+      One row per GA4 session (user_pseudo_id + ga_session_id), built from every event of the
+      session, not from session_start. No event in the sample lacks a ga_session_id (i1); the
+      filter in the model is a guard. Table, partitioned by session_date.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "session_end_at >= session_start_at and event_count >= 1"
+    columns:
+      - name: session_key
+        description: Surrogate of user_pseudo_id + ga_session_id, built in stg_ga4__events.
+        data_tests: [unique, not_null]
+      - name: user_pseudo_id
+        data_tests: [not_null]
+      - name: session_date
+        description: Reporting-timezone date of the first event; a session crossing midnight keeps its start date.
+        data_tests: [not_null]
+      - name: landing_page
+        description: page_location of the first event that has one.
+      - name: is_engaged
+        description: TRUE if any event of the session carries session_engaged = '1'.
+      - name: has_session_start_event
+        description: FALSE for the 5,272 sessions GA4 recorded without a session_start event.
+      - name: has_purchase
+        description: A purchase event fired, identified or not; transaction_count counts identified ones only.
+      - name: first_touch_source
+        description: The USER's first touch, repeated on each session. Not session attribution (ga4_notes).
