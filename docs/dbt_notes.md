@@ -128,6 +128,9 @@ Numbers that replace earlier estimates from here on: **906** unidentified purcha
 | i1 | Sessions by key vs session_start events | 360,129 vs 354,970 | 360,129 vs 354,970 | 5,159 sessions have no session_start |
 | i1b | Sessions on two event dates | unknown | 845 (0.23%) | Session keeps its start date; Week 9 lookback must cover them |
 | i2 | Sessions without a session_start event | about 5,159 (360,129 − 354,970) | 5,272 (1.5%) | The subtraction assumed one session_start per session. 354,857 sessions have one (360,129 − 5,272) and they carry 354,970 session_start events, so 113 events are duplicates. This is the 113 gap between Week 2 (354,857, sessions counted) and Week 6 (354,970, events counted). |
+| i3 | Status events; orders with events; late events | ~21,800; 5,458; 2,226 | 21,766; 5,458; 2,226 (10.2%) | ~4.0 events per order; first 2020-11-02 00:22 UTC, last 2021-03-03 16:09 UTC |
+| i3b | Instants where one order has two events | unknown | 160 pairs (320 events), never more than 2 | Time alone cannot order them; status_rank breaks the tie |
+| i3c | Which statuses tie | placed + paid (guess) | paid + placed: 160, nothing else | Instant payment; rank orders placed before paid |
 
 - int_ga4__sessions: 360.1k rows, 904.4 MiB processed per full build (table).
 - int_ga4__sessions

@@ -39,3 +39,34 @@ from (
 group by session_starts
 order by session_starts;
 
+-- i3 · shape of the status events
+select
+    count(*)                    as status_events, -- 21,766
+    count(distinct order_id)    as orders_with_events, -- 5,458
+    countif(is_late_arriving)   as late_events,  -- 2,226
+    min(event_at)               as first_event_at, -- 2020-11-02 00:22:16 UTC
+    max(event_at)               as last_event_at -- 2021-03-03 16:09:35 UTC
+from dbt_dev_staging.stg_backend__order_status_events;
+
+-- i3b · ties: two or more events of one order at the same instant
+select
+    count(*)                    as tied_instants,       -- 160
+    sum(events_at_instant)      as events_involved,     -- 320
+    max(events_at_instant)      as max_events_at_one_instant -- 2
+from (
+    select order_id, event_at, count(*) as events_at_instant
+    from dbt_dev_staging.stg_backend__order_status_events
+    group by order_id, event_at
+    having count(*) > 1
+);
+
+-- i3c · which statuses tie
+select statuses, count(*) as tied_instants
+from (
+    select order_id, event_at, string_agg(status, ' + ' order by status) as statuses
+    from dbt_dev_staging.stg_backend__order_status_events
+    group by order_id, event_at
+    having count(*) > 1
+)
+group by statuses
+order by tied_instants desc;
