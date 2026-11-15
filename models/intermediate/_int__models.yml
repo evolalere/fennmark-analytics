@@ -70,3 +70,30 @@ models:
         description: Time of the order's next status event; NULL on the current status.
       - name: is_current
         description: TRUE on the latest status event of each order.
+
+  - name: int_backend__customer_identity_map
+    description: >
+      One row per customer id raw ever issued (duplicates included), mapped to the customer
+      that survives the dedup in stg_backend__customers. Resolves a duplicate customer id
+      (source_customer_id) or a GA4 cookie (user_pseudo_id, where is_canonical) to one customer.
+      A cookie is a browser, not a person: user_id is never populated in the GA4 sample.
+    columns:
+      - name: source_customer_id
+        description: The id as it appears on orders and surveys.
+        data_tests: [unique, not_null]
+      - name: customer_id
+        description: The canonical customer (earliest row per cookie).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_backend__customers')
+                field: customer_id
+      - name: user_pseudo_id
+        description: GA4 cookie id; NULL for customers behind backend-only orders.
+        data_tests:
+          - unique:
+              config:
+                where: "is_canonical"
+
+  

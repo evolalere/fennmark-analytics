@@ -135,6 +135,8 @@ Numbers that replace earlier estimates from here on: **906** unidentified purcha
 | i4 | Current status of every order | sums to 5,458 | delivered 4,605 / refunded 451 / cancelled 290 / shipped 112 | 4,605 = 4,918 delivered − 313 returned; 451 = 456 refunds − 5 bad; none left in placed, paid or returned |
 | i5 | Status at 2020-12-24 12:00 UTC | orders placed by then | 4,041: delivered 2,945 / shipped 485 / paid 203 / cancelled 197 / refunded 187 / returned 14 / placed 10 | Shipped 12.0% vs 2.1% at the end: the December shipping lag |
 | i6 | Illegal transitions | no rows | no rows | Saved as is; becomes a singular test in week 10 |
+| i7 | Identity map: ids; customers; duplicate ids | 4,724; 4,651; 73 | 4,724; 4,651; 73 | Matches the week 5 dedup exactly |
+| i7 | Orders and surveys on a duplicate id, now resolved | 7; 5 | 7; 5 | The two week 5 relationships warns are gone; build has WARN=0 |
 
 - int_ga4__sessions: 360.1k rows, 904.4 MiB processed per full build (table).
 - int_ga4__sessions

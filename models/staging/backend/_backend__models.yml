@@ -22,10 +22,8 @@ models:
           - not_null
           - relationships:
               arguments:
-                to: ref('stg_backend__customers')
+                to: ref('stg_backend__customer_ids')
                 field: customer_id
-              config:
-                severity: warn        # 7 expected failures until Week 7 stitching
       - name: placed_at
         description: UTC. Equals the GA4 purchase event timestamp for web orders.
         data_tests: [not_null]
@@ -86,6 +84,14 @@ models:
         data_tests: [not_null]
       - name: created_at
         description: Account creation. The dedup keeps the row with the earliest created_at per cookie.
+
+  - name: stg_backend__customer_ids
+    description: >
+      Every customer id raw ever issued, duplicates included (4,724). Exists so that ids removed
+      by the dedup in stg_backend__customers can still be resolved (int_backend__customer_identity_map).
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
 
   - name: stg_backend__order_status_events
     description: >
@@ -310,10 +316,8 @@ models:
           - not_null
           - relationships:
               arguments:
-                to: ref('stg_backend__customers')
+                to: ref('stg_backend__customer_ids')
                 field: customer_id
-              config:
-                severity: warn        # same dedup consequence as orders.customer_id; Week 7 stitching
       - name: score
         description: 0-10; NULL when unanswered.
         data_tests:

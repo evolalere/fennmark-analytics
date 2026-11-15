@@ -92,3 +92,20 @@ from dbt_dev_intermediate.int_backend__order_status_history
 where not is_legal_transition
 group by previous_status, status
 order by transitions desc;
+
+-- i7 · customer id mapping
+select
+    count(*)                    as ids,              -- 4,724
+    countif(is_canonical)       as customers,        -- 4,651
+    countif(not is_canonical)   as duplicate_ids     -- 73
+from dbt_dev_intermediate.int_backend__customer_identity_map;
+
+select
+    (select count(*) from dbt_dev_staging.stg_backend__orders as orders
+        join dbt_dev_intermediate.int_backend__customer_identity_map as map
+            on orders.customer_id = map.source_customer_id
+        where not map.is_canonical)   as orders_restitched,    -- 7
+    (select count(*) from dbt_dev_staging.stg_backend__nps_surveys as surveys
+        join dbt_dev_intermediate.int_backend__customer_identity_map as map
+            on surveys.customer_id = map.source_customer_id
+        where not map.is_canonical)   as surveys_restitched;   -- 5
