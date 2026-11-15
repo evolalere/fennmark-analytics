@@ -96,7 +96,7 @@ two Week 5 `relationships` warns, 7 and 5 rows, cleared by Week 7's stitching).
 | q2 | stg_ga4__events rows, by month | 4,295,584 | 4,295,584 total; Nov 2020 1,472,712 / Dec 2020 1,612,725 / Jan 2021 1,210,147 | Nothing dropped |
 | q3 | Sessions by session_key vs session_start events | 360,129 vs 354,857 | 360,129 vs 354,970 | Week 2 counted 354,857 (113 fewer; likely a different suffix bound or count form in ga4_queries.sql q3). Gap to the key count is ~1.4% either way; Week 7 sessionises on the key, not on session_start |
 | q4 | Purchase events: identified + unidentified | ~4,784 + 883 | 4,786 + 906 = 5,692 | 906 = 883 '(not set)' + 23 NULL; Week 2 missed the NULLs |
-| q5 | Placeholder events (NULL revenue, no id) | 448 | 448 | Sub-bucket "GA4 purchase with no order data" |
+| q5 | Empty purchase events (no id, no revenue) | 448 | 450 | 448 carry one '(not set)' placeholder item (the Week 2 figure); 2 more have an empty items array (week 7 i8b) |
 | q6 | Transactions after dedup; duplicate events | ~4,451; ~324 | 4,451; 335 on 326 transactions | First event wins |
 | q6b | Duplicates agree on revenue? | — | 311 agree, 15 disagree | Small ambiguity GA4 cannot resolve; backend has the real figure |
 | q7 | Lines; GA4 header revenue = sum of net lines? | 13,218 | 13,218 lines; quantity matches on 4,451/4,451; header = lines on 3,618 (81%); differs on 833 (447 above, 386 below), not explained by shipping + tax | GA4 disagrees with itself on revenue before any backend comparison |
@@ -137,6 +137,8 @@ Numbers that replace earlier estimates from here on: **906** unidentified purcha
 | i6 | Illegal transitions | no rows | no rows | Saved as is; becomes a singular test in week 10 |
 | i7 | Identity map: ids; customers; duplicate ids | 4,724; 4,651; 73 | 4,724; 4,651; 73 | Matches the week 5 dedup exactly |
 | i7 | Orders and surveys on a duplicate id, now resolved | 7; 5 | 7; 5 | The two week 5 relationships warns are gone; build has WARN=0 |
+| i8 | Reconciliation rows by category and detail | 4,212 / 239 / 458 / 448 / 1,246 = 6,603 | matched 4,212 / no_backend_order 239 / unidentified 456 / placeholder 450 / backend_only 1,246 = 6,603 | GA4 side 5,357, backend side 5,458; placeholder is 450 by the model's definition, not 448. GA4 revenue 339,457 vs backend gross 356,422 (95.2%); matched agree at 289,997 |
+| i8b | What the 450 empty purchase events carry in items | 448 placeholder + 2 unknown | 448 single placeholder item; 2 no items; 0 with several | Explains 450 vs 448; the model's definition (no id, no revenue) covers both |
 
 - int_ga4__sessions: 360.1k rows, 904.4 MiB processed per full build (table).
 - int_ga4__sessions

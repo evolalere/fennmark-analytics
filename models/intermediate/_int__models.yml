@@ -96,4 +96,75 @@ models:
               config:
                 where: "is_canonical"
 
-  
+  - name: int_reconciliation__ga4_vs_backend
+    description: >
+      One row per purchase known to GA4, to the backend, or to both. Identified purchases
+      join on transaction_id = order_id; GA4 purchase events without a transaction id get
+      a row each and can never match. Backend orders are the system of record. Answers:
+      how many orders are matched, GA4-only and backend-only, and what is the revenue gap
+      on matched orders (domain_spec section 9).
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_backend__orders')
+          config:
+            where: "is_in_backend"       # no order lost or multiplied by the joins
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_ga4__purchases')
+          config:
+            where: "transaction_id is not null"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "is_backend_only"
+          config:
+            where: "reconciliation_category = 'backend_only'"   # only 'B-' orders are unseen by GA4
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "not is_backend_only"
+          config:
+            where: "reconciliation_category = 'matched'"
+    columns:
+      - name: reconciliation_key
+        description: Order id (either side), or 'ga4-event-' + event_key for an unidentified purchase.
+        data_tests: [unique, not_null]
+      - name: reconciliation_category
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['matched', 'ga4_only', 'backend_only']
+      - name: reconciliation_detail
+        description: >
+          Splits ga4_only into no_backend_order (GA4 has an id, the backend has no order),
+          unidentified (no transaction id) and placeholder (no id, no revenue; an empty purchase event).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['matched', 'backend_only', 'ga4_only_no_backend_order',
+                         'ga4_only_unidentified', 'ga4_only_placeholder']
+      - name: customer_id
+        description: Canonical customer via int_backend__customer_identity_map. NULL on ga4_only rows.
+        data_tests:
+          - not_null:
+              config:
+                where: "is_in_backend"
+      - name: gross_revenue_delta
+        description: GA4 header purchase_revenue minus backend gross_revenue; matched orders only.
+      - name: net_revenue_delta
+        description: GA4 header purchase_revenue minus backend net_revenue (after the unseen discount).
+      - name: revenue_delta_reason
+        description: >
+          Primary reason on a matched order, first match wins: currency_mismatch,
+          ga4_header_differs, backend_discount, exact. NULL on unmatched rows.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['exact', 'backend_discount', 'ga4_header_differs', 'currency_mismatch']
+      - name: has_ga4_header_vs_lines_gap
+        description: GA4's header revenue differs from the sum of its own net lines (833 of 4,451 in week 6).
+      - name: is_same_cookie
+        description: GA4 purchase cookie = stitched customer's cookie; matched orders only.
+        
+         

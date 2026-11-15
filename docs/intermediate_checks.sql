@@ -109,3 +109,31 @@ select
         join dbt_dev_intermediate.int_backend__customer_identity_map as map
             on surveys.customer_id = map.source_customer_id
         where not map.is_canonical)   as surveys_restitched;   -- 5
+
+-- i8 · reconciliation
+select reconciliation_category, reconciliation_detail, count(*) as purchases,
+       round(sum(ga4_purchase_revenue), 2) as ga4_revenue,
+       round(sum(gross_revenue), 2)        as backend_gross_revenue
+from dbt_dev_intermediate.int_reconciliation__ga4_vs_backend
+group by reconciliation_category, reconciliation_detail
+order by reconciliation_category, reconciliation_detail;
+
+-- i8b · what the 450 no-id, no-revenue purchase events carry in items
+select
+    count(*)                                                       as events,
+    countif(array_length(items) = 1
+            and items[safe_offset(0)].price is null)               as single_placeholder_item,
+    countif(array_length(items) = 0)                               as no_items,
+    countif(array_length(items) > 1)                               as several_items,
+    countif(ecommerce.transaction_id is null)                      as null_transaction_id
+from `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+where _table_suffix between '20201101' and '20210131'
+    and event_name = 'purchase'
+    and ecommerce.purchase_revenue is null
+    and coalesce(
+        nullif(ecommerce.transaction_id, '(not set)'),
+        nullif((select any_value(value.string_value) from unnest(event_params)
+                where key = 'transaction_id'), '(not set)')
+    ) is null;
+
+    
