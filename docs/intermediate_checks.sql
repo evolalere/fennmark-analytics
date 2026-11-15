@@ -70,3 +70,25 @@ from (
 )
 group by statuses
 order by tied_instants desc;
+
+-- i4 · current status of every order
+select status, count(*) as orders
+from dbt_dev_intermediate.int_backend__order_status_history
+where is_current
+group by status
+order by orders desc; -- sums to 5,458
+
+-- i5 · status at time T: where was every order on Christmas Eve 2020?
+select status, count(*) as orders
+from dbt_dev_intermediate.int_backend__order_status_history
+where valid_from <= timestamp '2020-12-24 12:00:00'
+and (valid_to > timestamp '2020-12-24 12:00:00' or valid_to is null)
+group by status
+order by orders desc; -- only orders placed by then
+
+-- i6 · illegal transitions (expected: no rows). Week 10 turns this into a singular test.
+select previous_status, status, count(*) as transitions
+from dbt_dev_intermediate.int_backend__order_status_history
+where not is_legal_transition
+group by previous_status, status
+order by transitions desc;

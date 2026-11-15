@@ -29,3 +29,44 @@ models:
         description: A purchase event fired, identified or not; transaction_count counts identified ones only.
       - name: first_touch_source
         description: The USER's first touch, repeated on each session. Not session attribution (ga4_notes).
+
+  - name: int_backend__order_status_history
+    description: >
+      One row per status event with the interval [valid_from, valid_to) during which it was the
+      order's status. Status at time T and current status are both read from here; orders
+      carry no status column (docs/decisions.md 2026-10-27). Ordered by event time, so
+      late-arriving events sit in their true position. 160 orders have placed and paid at the
+      same instant; status_rank breaks the tie.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, status_sequence]
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "valid_to is null or valid_to >= valid_from"
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_backend__orders')
+          config:
+            where: "is_current"        # every order has exactly one current status
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_backend__orders')
+                field: order_id
+          - unique:
+              config:
+                where: "is_current"
+      - name: status_sequence
+        description: 1 for the first event of an order (placed), counting up in event-time order.
+      - name: is_legal_transition
+        description: FALSE when previous_status -> status is not allowed (domain_spec s.4). Tested in week 10.
+      - name: valid_to
+        description: Time of the order's next status event; NULL on the current status.
+      - name: is_current
+        description: TRUE on the latest status event of each order.

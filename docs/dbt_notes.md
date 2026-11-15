@@ -131,6 +131,10 @@ Numbers that replace earlier estimates from here on: **906** unidentified purcha
 | i3 | Status events; orders with events; late events | ~21,800; 5,458; 2,226 | 21,766; 5,458; 2,226 (10.2%) | ~4.0 events per order; first 2020-11-02 00:22 UTC, last 2021-03-03 16:09 UTC |
 | i3b | Instants where one order has two events | unknown | 160 pairs (320 events), never more than 2 | Time alone cannot order them; status_rank breaks the tie |
 | i3c | Which statuses tie | placed + paid (guess) | paid + placed: 160, nothing else | Instant payment; rank orders placed before paid |
+| i3d | History rows; current rows; illegal transitions; instant payments | 21,766; 5,458; 0; 160 | 21,766; 5,458; 0; 160 | One current status per order; tiebreak orders all 160 ties correctly |
+| i4 | Current status of every order | sums to 5,458 | delivered 4,605 / refunded 451 / cancelled 290 / shipped 112 | 4,605 = 4,918 delivered − 313 returned; 451 = 456 refunds − 5 bad; none left in placed, paid or returned |
+| i5 | Status at 2020-12-24 12:00 UTC | orders placed by then | 4,041: delivered 2,945 / shipped 485 / paid 203 / cancelled 197 / refunded 187 / returned 14 / placed 10 | Shipped 12.0% vs 2.1% at the end: the December shipping lag |
+| i6 | Illegal transitions | no rows | no rows | Saved as is; becomes a singular test in week 10 |
 
 - int_ga4__sessions: 360.1k rows, 904.4 MiB processed per full build (table).
 - int_ga4__sessions
