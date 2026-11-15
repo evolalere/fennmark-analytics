@@ -120,7 +120,26 @@ Numbers that replace earlier estimates from here on: **906** unidentified purcha
 (not 883), **4,451** transactions, **335** duplicate events on **326** transactions,
 **354,970** session_start events (not 354,857).
 
+## Intermediate conventions (week 7)
+
+- **Refs only.** Intermediate models `ref()` staging models or each other, never `source()`. Joins,
+  whole-entity window functions and changes of grain start here.
+- **Naming.** `int_<source>__<what>`; the one model that crosses sources is `int_reconciliation__`.
+- **Views, two exceptions.** `int_ga4__sessions` (aggregates 4.3M events, 904 MiB per build) and
+  `int_reconciliation__ga4_vs_backend` (reads both GA4 purchase views, 2.0 GiB) are tables, set in
+  the model's own `config()`.
+- **Layout.** Import CTEs named after what they hold, then logic CTEs, then `final`.
+- **Label what the data shows.** A GA4 purchase without an order is `ga4_only_no_backend_order`,
+  not "payment declined". The generator's answer key checks results; it is never an input.
+- **A cookie is not a person.** Stitching is `user_pseudo_id` to customer; `user_id` is never populated.
+- **No warn-level tests.** The two week 5 warns were split into two error-level questions
+  (id exists in the source; id resolves to a surviving customer).
+
 ## Intermediate checks (week 7)
+
+Queries in `docs/intermediate_checks.sql`. Run 2026-11-11 to 2026-11-15 against `dbt_dev_staging`
+and `dbt_dev_intermediate`. Full build 2026-11-15: 1 seed, 18 models (14 staging, 4 intermediate),
+143 tests, PASS=162, WARN=0, 100 s. The two week 5 relationships warns are gone.
 
 | # | Check | Expected | Actual | Note |
 | --- | --- | --- | --- | --- |
@@ -139,6 +158,11 @@ Numbers that replace earlier estimates from here on: **906** unidentified purcha
 | i7 | Orders and surveys on a duplicate id, now resolved | 7; 5 | 7; 5 | The two week 5 relationships warns are gone; build has WARN=0 |
 | i8 | Reconciliation rows by category and detail | 4,212 / 239 / 458 / 448 / 1,246 = 6,603 | matched 4,212 / no_backend_order 239 / unidentified 456 / placeholder 450 / backend_only 1,246 = 6,603 | GA4 side 5,357, backend side 5,458; placeholder is 450 by the model's definition, not 448. GA4 revenue 339,457 vs backend gross 356,422 (95.2%); matched agree at 289,997 |
 | i8b | What the 450 empty purchase events carry in items | 448 placeholder + 2 unknown | 448 single placeholder item; 2 no items; 0 with several | Explains 450 vs 448; the model's definition (no id, no revenue) covers both |
+| i9 | Revenue reason on matched orders | discount ~628; small ga4_header_differs | exact 3,571 / backend_discount 626 / currency_mismatch 15; no ga4_header_differs | Gross delta 0 on every order; net gap 4,588.13 (1.6%), all backend discount; 2 discounted orders are EUR-flagged, hence 626 not 628 |
+| i10 | Flags on matched orders | discount 628; line sums differ 0 | discount 628 / header-vs-lines 781 (18.5%) / line discount 556 / line sums differ 0 / same cookie 4,212 / same timestamp 4,212 / EUR 15 | Stitching and timestamps agree on all matched orders |
+| i11 | Orders placed on or after 2021-02-01 UTC | unknown | 27; first order 2020-11-02 00:22 UTC, last 2021-02-07 09:20 UTC | Split by category in i11b; decides the week 8 reporting-period filter |
+| i11b | Category of the 27 orders after 2021-01-31 UTC | backend_only | backend_only 27 (1 to 7 Feb); no matched | UTC cut-off is safe; in-window 5,431 orders, 4,212 matched (77.6%) |
+| i12 | ga4_only_no_backend_order vs generator answer key | 239 | 239 (file has 240 lines incl. header) | Found from data alone; file never used as input |
 
 - int_ga4__sessions: 360.1k rows, 904.4 MiB processed per full build (table).
 - int_ga4__sessions

@@ -3,6 +3,14 @@
 A short log of design decisions that changed the project's direction. One entry per decision:
 context, decision, consequence. Newest at the top.
 
+## 2026-11-15 · Reconciliation compares GA4 header revenue to backend gross, and labels only what the data shows (week 7)
+
+**Context.** GA4 reports two revenue figures per transaction that disagree with each other on 833 of 4,451 (header vs summed lines). 906 purchase events carry no transaction id. The generator knows why 239 GA4 purchases have no order (declined payment); the data does not say.
+
+**Decision.** `int_reconciliation__ga4_vs_backend` has one row per purchase known to either system. The headline revenue comparison is GA4 header `purchase_revenue` vs backend `gross_revenue`; the line-level gap is a flag. Each matched order gets one primary `revenue_delta_reason`. GA4-only rows are split by what is observable (no backend order / unidentified / placeholder); `_ga4_only_ids.csv` checks the result and is never an input. Customers are stitched cookie to customer through `int_backend__customer_identity_map`; a cookie is a browser, not a person.
+
+**Consequence.** 6,603 rows: 4,212 matched, 239 + 456 + 450 GA4-only, 1,246 backend-only, adding up to both sources' totals (tested). Matched orders agree on gross on every order; the net gap of 4,588.13 (1.6%) is entirely backend discount. The week 5 warn-level relationships tests are replaced by error-level ones and the build has no warnings. Week 8's marts read status, customer and reconciliation category from intermediate and add no logic of their own.
+
 ## 2026-11-10 · GA4 staging keeps every event, models only identified purchases, and is the one table in the staging layer (week 6)
 
 **Context.** The GA4 export has no primary key, 906 purchase events with no usable

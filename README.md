@@ -4,8 +4,8 @@ End-to-end analytics for a direct-to-consumer merchandise and apparel brand: Goo
 e-commerce sample joined to a generated, deliberately messy order backend, modelled with dbt on
 BigQuery, tested, and reconciled source against source.
 
-**Status:** Phase 2, week 6 of 16: backend and GA4 staged and tested; dbt build green.
-(1 seed, 13 models). Next: Reconciliation (week 7), marts (week 8).
+**Status:** Phase 2, week 7 of 16: sessions, order status history, customer stitching and GA4-vs-backend reconciliation built and tested. 
+Next: Marts (week 8).
 
 **Stack:** BigQuery, dbt 1.12, Python (pandas, Faker), GitHub Actions, Tableau Public
 
@@ -19,6 +19,7 @@ BigQuery, tested, and reconciled source against source.
 | Source: GA4 | Google Merchandise Store events, 2020-11-01 .. 2021-01-31 (4.3 M events, public) | `bigquery-public-data.ga4_obfuscated_sample_ecommerce` |
 | Source: backend | 10 tables behind those events (orders, lifecycle, returns, refunds, NPS, spend, A/B test) with 11 injected data problems | `generator/` |
 | Staging | One model per raw table: rename, cast, dedup, parse; every key tested | `models/staging/backend/` |
+| Intermediate | Four models - sessions, order status history, customer stitching and GA4-vs-backend reconciliation built and tested | `models/intermediate/` |
 | Seed | Canonical product category, mapped from GA4's navigation breadcrumbs | `seeds/product_category_overrides.csv` |
 | Macro | `parse_mixed_timestamp`: two string formats to one UTC timestamp | `macros/` |
 

@@ -136,4 +136,38 @@ where _table_suffix between '20201101' and '20210131'
                 where key = 'transaction_id'), '(not set)')
     ) is null;
 
-    
+-- i9 · why matched orders differ in revenue
+select revenue_delta_reason, count(*) as orders,
+       round(sum(gross_revenue_delta), 2) as gross_delta,
+       round(sum(net_revenue_delta), 2)   as net_delta
+from dbt_dev_intermediate.int_reconciliation__ga4_vs_backend
+where reconciliation_category = 'matched'
+group by revenue_delta_reason
+order by orders desc;
+
+-- i10 · independent flags and stitching, matched orders only
+select
+    countif(has_backend_discount)             as with_backend_discount,
+    countif(has_ga4_header_vs_lines_gap)      as ga4_header_vs_lines_gap,
+    countif(has_ga4_line_discount)            as ga4_line_discount,
+    countif(net_lines_delta != 0)             as line_sums_differ,
+    countif(is_same_cookie)                   as same_cookie,
+    countif(placed_at = purchased_at)         as same_timestamp,
+    countif(has_currency_mismatch)            as eur_flagged
+from dbt_dev_intermediate.int_reconciliation__ga4_vs_backend
+where reconciliation_category = 'matched';
+
+-- i11 · backend orders placed outside the ga4 window
+select
+    countif(placed_at >= timestamp '2021-02-01')    as orders_after_window,
+    min(placed_at)                                  as first_order_at,
+    max(placed_at)                                  as last_order_at
+from dbt_dev_staging.stg_backend__orders;
+
+-- i11b · who is placed after 2021-01-31 utc
+select reconciliation_category, count(*) as orders,
+       min(placed_at) as first_at, max(placed_at) as last_at
+from dbt_dev_intermediate.int_reconciliation__ga4_vs_backend
+where placed_at >= timestamp '2021-02-01'
+group by reconciliation_category;
+
