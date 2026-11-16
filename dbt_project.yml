@@ -21,6 +21,9 @@ vars:
   ga4_start_date: '2020-11-01'
   ga4_end_date: '2021-01-31'
 
+  reporting_start_date: '2020-11-01'    # business reporting period, by order date (domain_spec section 6)
+  reporting_end_date: '2021-01-31'
+
 models:
   fennmark:
     staging:
@@ -29,6 +32,9 @@ models:
     intermediate:
       +materialized: view
       +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
 
 seeds:
   fennmark:

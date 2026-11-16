@@ -1,0 +1,108 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: >
+      What were net revenue and order count per week by channel, and what share of orders did
+      GA4 miss? One row per backend order (system of record). Customer is the canonical one;
+      status and milestone timestamps are pivoted from int_backend__order_status_history;
+      reconciliation_category comes from int_reconciliation__ga4_vs_backend. Revenue is in the
+      order's own currency: filter on has_currency_mismatch before summing. All orders are kept;
+      is_in_reporting_period marks the 2020-11-01 to 2021-01-31 window (docs/decisions.md).
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_backend__orders')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "round(net_revenue, 2) = round(gross_revenue - discount_amount, 2)"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "is_backend_only = (reconciliation_category = 'backend_only')"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "delivered_at >= shipped_at and shipped_at >= paid_at"
+          config:
+            where: "is_delivered"
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        description: Canonical customer (duplicate ids resolved through the identity map).
+        data_tests:
+          - not_null
+      - name: order_date
+        description: UTC date of placed_at.
+        data_tests: [not_null]
+      - name: order_week
+        description: Monday of the order's week. The first is 2020-11-02 (no orders on Sunday 1 Nov).
+      - name: channel
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['web', 'app', 'phone']
+      - name: net_revenue
+        description: gross_revenue minus discount_amount, in the order's currency. Not reduced by refunds.
+      - name: refunded_amount
+        description: >
+          Sum of refunds on the order; 0 if none. 5 orders carry a refund while still
+          'shipped' (deliberate, week 10).
+      - name: current_status
+        description: Status of the latest status event. Orders carry no status column of their own.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['placed', 'paid', 'shipped', 'delivered', 'cancelled', 'returned', 'refunded']
+      - name: days_to_deliver
+        description: Whole days from placed_at to delivered_at; NULL if not delivered.
+      - name: reconciliation_category
+        description: matched (GA4 saw the purchase) or backend_only (it did not).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['matched', 'backend_only']
+      - name: is_cancelled
+        description: The order has a cancelled event, paid or not. Revenue questions exclude these.
+      - name: is_in_reporting_period
+        description: order_date within reporting_start_date and reporting_end_date (dbt_project.yml vars).
+        data_tests: [not_null]
+      - name: customer_order_number
+        description: 1 for the customer's first order placed, counting up; cancelled orders included.
+        data_tests: [not_null]
+
+  - name: fct_order_items
+    description: >
+      Which products and categories carry the margin, and which sell volume at low margin?
+      One row per product line. line_revenue is what the line sold for (net of line discount);
+      margin_amount = line_revenue - cost_price x quantity. Order-level discounts are not
+      allocated to lines, so line revenue does not sum to order net revenue: revenue questions
+      go to fct_orders, product and margin questions come here.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_backend__order_items')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "cost_amount >= 0 and margin_amount = line_revenue - cost_amount"
+    columns:
+      - name: order_item_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
+      - name: product_id
+        data_tests:
+          - not_null
+      - name: customer_id
+        description: Canonical customer, from fct_orders.
+      - name: margin_amount
+        description: >
+          Can be negative on a heavily discounted line. A rate is
+          sum(margin_amount) / sum(line_revenue), never an average of rates.
+

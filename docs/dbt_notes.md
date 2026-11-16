@@ -178,6 +178,15 @@ and `dbt_dev_intermediate`. Full build 2026-11-15: 1 seed, 18 models (14 staging
 | Zero duration | 58,370 (16.2%)	 | One-event sessions, or all events at the same instant |
 | Median duration | 13 s | approx_quantiles is approximate; treat as “about 13 s” |
 
+
+## Mart checks (week 8)
+
+| m1 | Orders; in period; in stub week; EUR; discounted | 5,458; 5,431; n/a; ~20; ≥628 | 5,458; 5,431; 0; 20; 628 | No orders on 1 Nov, so no stub order week; discounts only on GA4-seeded orders |
+| m2 | fct_orders shape | 5,458; ≤4,651 customers; 5,431 in period; 428 cancelled; 4,918 delivered; 313 returned; 456 with refund; 5 refunded while shipped | 5,458; 4,491; 5,431; 428; 4,918; 313; 456; 5; max 16 orders per customer | 160 customers have no order (m2b); 1.8 MiB per build |
+| m2b | Customers with no order; without cookie; cookie has a GA4-only purchase | 160; 0; ~160 | 160; 0; 160 | All 160 are GA4 purchasers whose only purchase got no backend order |
+| m5 | Orders with lines; lines = gross; lines ≠ gross; negative-margin lines | 5,458; n/a; several hundred (≤833 among matched); n/a | 5,458; 4,677; 781; 26 | 14.3% of orders: GA4 header vs line revenue gap carried through; revenue from fct_orders, margin from fct_order_items |
+
+
 ## Source freshness
 
 Thresholds in `models/staging/backend/_backend__sources.yml` follow each feed's real cadence,
