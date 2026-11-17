@@ -169,6 +169,13 @@ Status: draft, week 3
 - **Reconciliation.** The last row in the table isn’t a mart; it’s the Week 7 intermediate model that compares the two sources order by order. It takes every deduplicated GA4 purchase and every backend order, joins them on transaction_id = order_id, and sorts the result into three buckets: matched (in both), GA4-only (purchase event, no order: payment failed), backend-only (order, no event: phone, app, ad blocker). For matched orders it also computes the revenue difference, which is rarely zero (discounts after the event, item_revenue vs gross, rounding).
 - The business question for it is therefore: how many orders fall in each bucket, and how big is the revenue gap on matched orders? It’s the one answer to the question that frequently arise when finance and marketing report different numbers.
 
+- Answer to above question on dim_customers (from Mart):
+  From 1 Nov 2020 to 31 Jan 2021, 577 of 4,168 buyers (13.8%) placed two or more non-cancelled orders. Of all 4,651 customers, 2,544 (54.7%) consented to email, 1,402 declined and 705 (15.2%) were never asked. A customer is a cookie, so the repeat share is a floor.
+- Answer to above question on dim_products (from Mart):
+  12 SKUs were launched between 1 Nov 2020 and 31 Jan 2021; 8 of them have sold, on average 42.4 days after launch. Across the whole catalogue, 786 of 1,231 SKUs (63.9%) have sold and 445 never have.
+- Answer to above question on fct_order_items (from Mart):
+  From 1 Nov 2020 to 31 Jan 2021, Apparel carried 67.7% of margin (109,114 of 161,202) at a 51.9% rate. Stationery sold 24.3% of units but brought 4.9% of margin, at 44.3%. Overall margin rate was 49.5%.
+
 ## 10. Out of scope
 - Inventory and stock levels
 - Multi-currency conversion

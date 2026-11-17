@@ -55,3 +55,70 @@ inner join (
 ) as lines
     on orders.order_id = lines.order_id;
 
+-- m6 · Q2: margin by category
+select
+    products.category,
+    sum(items.quantity)                                             as units,
+    round(sum(items.line_revenue), 2)                               as revenue,
+    round(sum(items.margin_amount), 2)                              as margin,
+    round(safe_divide(sum(items.margin_amount), sum(items.line_revenue)), 3) as margin_rate
+from dbt_dev_marts.fct_order_items as items
+inner join dbt_dev_marts.dim_products as products
+    on items.product_id = products.product_id
+where items.is_in_reporting_period
+    and not items.is_cancelled
+    and not items.has_currency_mismatch
+group by products.category
+order by margin desc;
+
+-- m7 · Q3: repeat buyers and consent
+select
+    count(*)                                                        as customers,
+    countif(is_buyer)                                               as buyers_in_period,
+    countif(is_repeat_buyer)                                        as repeat_buyers,
+    round(safe_divide(countif(is_repeat_buyer), countif(is_buyer)), 4) as repeat_share,
+    countif(email_consent_status = 'consented')                     as consented,
+    countif(email_consent_status = 'declined')                      as declined,
+    countif(email_consent_status = 'unknown')                       as unknown,
+    countif(is_linked_to_ga4)                                       as linked_to_ga4
+from dbt_dev_marts.dim_customers;
+
+-- m8 · Q4: launches and time to first sale
+select
+    count(*)                                                        as skus,
+    countif(is_sold)                                                as skus_sold,
+    countif(is_launched_in_period)                                  as launched_in_period,
+    countif(is_launched_in_period and is_sold)                      as launched_and_sold,
+    round(avg(if(is_launched_in_period, days_to_first_sale, null)), 1) as avg_days_to_first_sale,
+    min(days_to_first_sale)                                         as min_days_to_first_sale
+from dbt_dev_marts.dim_products;
+
+-- m9a · fct_returns: shape
+select
+    count(*)                                                        as returned_lines,
+    countif(return_line_number = 1)                                 as requests,
+    countif(return_line_number = 1 and is_accepted)                 as accepted_requests,
+    countif(return_line_number = 1 and is_whole_order_return)       as whole_order_requests,
+    min(days_from_delivery)                                         as min_days_from_delivery,
+    max(days_from_delivery)                                         as max_days_from_delivery
+from dbt_dev_marts.fct_returns;
+
+-- m10a · fct_nps: shape, and whether the delivery-time bands are usable
+select
+    count(*)                                                        as surveys,
+    countif(has_responded)                                          as responses,
+    countif(nps_category = 'promoter')                              as promoters,
+    countif(nps_category = 'passive')                               as passives,
+    countif(nps_category = 'detractor')                             as detractors,
+    round(avg(nps_points), 1)                                       as nps,
+    min(days_to_deliver)                                            as min_days_to_deliver,
+    max(days_to_deliver)                                            as max_days_to_deliver
+from dbt_dev_marts.fct_nps;
+
+select
+    delivery_time_band,
+    count(*)                                                        as surveys,
+    countif(has_responded)                                          as responses
+from dbt_dev_marts.fct_nps
+group by delivery_time_band
+order by delivery_time_band;

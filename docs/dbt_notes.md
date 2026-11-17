@@ -185,7 +185,11 @@ and `dbt_dev_intermediate`. Full build 2026-11-15: 1 seed, 18 models (14 staging
 | m2 | fct_orders shape | 5,458; ≤4,651 customers; 5,431 in period; 428 cancelled; 4,918 delivered; 313 returned; 456 with refund; 5 refunded while shipped | 5,458; 4,491; 5,431; 428; 4,918; 313; 456; 5; max 16 orders per customer | 160 customers have no order (m2b); 1.8 MiB per build |
 | m2b | Customers with no order; without cookie; cookie has a GA4-only purchase | 160; 0; ~160 | 160; 0; 160 | All 160 are GA4 purchasers whose only purchase got no backend order |
 | m5 | Orders with lines; lines = gross; lines ≠ gross; negative-margin lines | 5,458; n/a; several hundred (≤833 among matched); n/a | 5,458; 4,677; 781; 26 | 14.3% of orders: GA4 header vs line revenue gap carried through; revenue from fct_orders, margin from fct_order_items |
-
+| m6 | Margin by category (period, not cancelled, USD) | 7 categories, no Other; rates ~0.30 to 0.60 | Apparel 210,261 / 109,114 / 51.9%; Drinkware 43,727 / 19,683 / 45.0%; Bags 27,490 / 12,340 / 44.9%; Accessories 19,797 / 9,054 / 45.7%; Stationery 17,705 / 7,835 / 44.3%; Lifestyle 4,121 / 1,741 / 42.2%; Gift Cards 2,800 / 1,435 / 51.2% | Total 325,901 / 161,202 / 49.5%; Apparel 67.7% of margin; Stationery 24.3% of units, 4.9% of margin |
+| m7 | Customers; buyers in period; repeat buyers; share; consented / declined / unknown; linked to GA4 | 4,651; <4,491; n/a; n/a; unknown ~700; n/a | 4,651; 4,168; 577; 13.84%; 2,544 / 1,402 / 705; 4,514 | 323 customers have only cancelled or February orders; 137 customers have no cookie |
+| m8 | SKUs; sold; launched in period; launched and sold; avg days to first sale; min days | 1,231; n/a; small or 0; n/a; n/a; ≥0 | 1,231; 786; 12; 8; 42.4; 13 | 445 SKUs (36.1%) never sold; no sale before launch |
+| m9a | Returned lines; requests; accepted; whole-order; days from delivery | >373; 373; 313; ~150; 0 to 30 | 650; 373; 313; 161; 1 to 30 | 212 item returns + 161 whole-order returns expanded to 438 lines; 83.9% accepted |
+| m10a | Surveys; responses; promoters / passives / detractors; NPS; days to deliver; band responses | 4,918; ~1,970; sum = responses; n/a; n/a; three usable bands | 4,918; 1,947 (39.6%); 722 / 619 / 606; 6.0; 2 to 12; 496 / 957 / 494 | Band edges at 5 and 8 days kept |
 
 ## Source freshness
 

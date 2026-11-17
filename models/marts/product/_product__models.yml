@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: fct_returns
+    description: >
+      What is the return rate by product category and channel, and what are the top reasons?
+      One row per returned order line. A whole-order return is expanded to every line of its
+      order so that a rate by category has lines in both numerator and denominator.
+      return_line_number = 1 gives one row per return request. Refund amounts are not here
+      (they would repeat per line); they are on fct_orders.refunded_amount.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_backend__returns')
+          config:
+            where: "return_line_number = 1"     # no request lost by the join to lines
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "days_from_delivery >= 0"
+    columns:
+      - name: return_line_id
+        description: Surrogate of return_id + order_item_id.
+        data_tests: [unique, not_null]
+      - name: return_id
+        data_tests: [not_null]
+      - name: order_item_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_order_items')
+                field: order_item_id
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+      - name: reason
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['wrong_size', 'damaged', 'not_as_described', 'changed_mind']
+      - name: is_accepted
+        description: A refused request produces no status event and no refund.
+        data_tests: [not_null]
+
+  - name: fct_nps
+    description: >
+      What is NPS by delivery month, and does it move with shipping time?
+      One row per survey sent. nps_category: promoter 9-10, passive 7-8, detractor 0-6, NULL
+      when unanswered. NPS = avg(nps_points) over answered surveys.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_backend__nps_surveys')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(nps_category is null) = (not has_responded)"
+    columns:
+      - name: survey_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: delivered_at
+        description: Surveys go to delivered orders only, so this is never NULL.
+        data_tests: [not_null]
+      - name: nps_category
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['promoter', 'passive', 'detractor']
+      - name: nps_points
+        description: 100 promoter, 0 passive, -100 detractor; NULL when unanswered.
+

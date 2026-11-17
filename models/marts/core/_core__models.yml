@@ -31,6 +31,10 @@ models:
         description: Canonical customer (duplicate ids resolved through the identity map).
         data_tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
       - name: order_date
         description: UTC date of placed_at.
         data_tests: [not_null]
@@ -99,10 +103,75 @@ models:
       - name: product_id
         data_tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
       - name: customer_id
         description: Canonical customer, from fct_orders.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
       - name: margin_amount
         description: >
           Can be negative on a heavily discounted line. A rate is
           sum(margin_amount) / sum(line_revenue), never an average of rates.
+
+  - name: dim_customers
+    description: >
+      What share of customers in the period are repeat buyers, and how many consented to email?
+      One row per customer after the staging dedup. order_count, first/last order date and
+      net_revenue_usd cover orders placed in the reporting period that were not cancelled.
+      A NULL consent flag is treated as not consented here and nowhere earlier. No name or email.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_backend__customers')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "(order_count = 0) = (first_order_date is null)"
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: user_pseudo_id
+        description: GA4 cookie the customer was seeded from; NULL behind backend-only orders.
+        data_tests: [unique]
+      - name: email_consent_status
+        description: consented, declined, or unknown (NULL in raw).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['consented', 'declined', 'unknown']
+      - name: is_email_contactable
+        description: TRUE only for an explicit yes. unknown counts as no.
+        data_tests: [not_null]
+      - name: is_repeat_buyer
+        description: Two or more non-cancelled orders in the reporting period.
+
+  - name: dim_products
+    description: >
+      How many products were launched in the window, and how long until first sale?
+      One row per SKU (GA4 item_id). list_price is a reference price; the price charged is on
+      fct_order_items. first_sold_date is NULL for SKUs that were viewed but never bought.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('stg_backend__products')
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "is_sold = (first_sold_date is not null)"
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+      - name: category
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Apparel', 'Drinkware', 'Bags', 'Accessories', 'Stationery', 'Lifestyle',
+                         'Gift Cards', 'Other']
+      - name: days_to_first_sale
+        description: first_sold_date minus launch_date, in days; NULL if never sold.
 
