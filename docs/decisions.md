@@ -3,6 +3,26 @@
 A short log of design decisions that changed the project's direction. One entry per decision:
 context, decision, consequence. Newest at the top.
 
+## 2026-11-19 · Marts keep every order and state their revenue rule (week 8)
+
+**Context.** 27 backend-only orders fall after the reporting period; 428 orders were cancelled; 20 are
+in EUR; refunds arrive weeks after the order. 161 of 373 returns are whole-order returns with no line.
+1,850 purchase sessions have no add_to_cart event.
+
+**Decision.** `fct_orders` keeps all 5,458 orders and flags the period (2020-11-01 to 2021-01-31 by
+order date, project vars). Net revenue = `net_revenue` of orders not cancelled, USD only; refunds are
+reported beside it, not netted. `fct_returns` is at returned-line grain, whole-order returns expanded
+to their lines. Weeks start Monday: the first order week is 2020-11-02; sessions have a one-day stub
+week (2020-10-26). Cohort models store counts and mark complete periods. `funnel_depth` stays a
+strict in-order funnel and its limit is documented. `fct_nps` carries `days_in_transit` (shipped to
+delivered) beside `days_to_deliver`.
+
+**Consequence.** Row-count tests stay exact against staging. Every revenue figure names its three
+filters: 321,733.25 USD net on 5,006 orders. Return rate by category divides lines by lines (650 of
+13,374). Line revenue does not sum to order revenue. The closed funnel captures 2,848 of 4,848
+purchase sessions, so view to cart (19.7%) is a lower bound. NPS steps from +21.3 to −23.2 above
+5 days in transit; the December dip the generator README predicted does not exist.
+
 ## 2026-11-15 · Reconciliation compares GA4 header revenue to backend gross, and labels only what the data shows (week 7)
 
 **Context.** GA4 reports two revenue figures per transaction that disagree with each other on 833 of 4,451 (header vs summed lines). 906 purchase events carry no transaction id. The generator knows why 239 GA4 purchases have no order (declined payment); the data does not say.

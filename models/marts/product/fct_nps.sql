@@ -52,6 +52,7 @@ final as (
         -- attributes
         orders.channel,
         orders.days_to_deliver,
+        orders.days_in_transit,
         case
             when orders.days_to_deliver <= 5 then '1: up to 5 days'
             when orders.days_to_deliver <= 8 then '2: 6 to 8 days'

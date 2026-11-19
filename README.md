@@ -4,8 +4,7 @@ End-to-end analytics for a direct-to-consumer merchandise and apparel brand: Goo
 e-commerce sample joined to a generated, deliberately messy order backend, modelled with dbt on
 BigQuery, tested, and reconciled source against source.
 
-**Status:** Phase 2, week 7 of 16: sessions, order status history, customer stitching and GA4-vs-backend reconciliation built and tested. 
-Next: Marts (week 8).
+**Status:** Phase 2 complete, week 8 of 16: nine marts built and tested; each answers a written business question.
 
 **Stack:** BigQuery, dbt 1.12, Python (pandas, Faker), GitHub Actions, Tableau Public
 
@@ -20,6 +19,7 @@ Next: Marts (week 8).
 | Source: backend | 10 tables behind those events (orders, lifecycle, returns, refunds, NPS, spend, A/B test) with 11 injected data problems | `generator/` |
 | Staging | One model per raw table: rename, cast, dedup, parse; every key tested | `models/staging/backend/` |
 | Intermediate | Four models - sessions, order status history, customer stitching and GA4-vs-backend reconciliation built and tested | `models/intermediate/` |
+| Marts | Nine models - customers, products, order_items, orders, repeat purchases, retention_cohorts, nps, returns and sesssions | `models/marts/` |
 | Seed | Canonical product category, mapped from GA4's navigation breadcrumbs | `seeds/product_category_overrides.csv` |
 | Macro | `parse_mixed_timestamp`: two string formats to one UTC timestamp | `macros/` |
 

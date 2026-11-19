@@ -118,6 +118,7 @@ joined as (
         milestones.refunded_at,
         milestones.cancellation_reason,
         timestamp_diff(milestones.delivered_at, orders.placed_at, day) as days_to_deliver,
+        timestamp_diff(milestones.delivered_at, milestones.shipped_at, day) as days_in_transit,
 
         -- reconciliation with ga4
         reconciliation.reconciliation_category,

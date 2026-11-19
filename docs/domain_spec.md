@@ -1,5 +1,5 @@
 # Fennmark domain spec
-Status: draft, week 3
+Status: built, week 8
 
 ## 1. Business and sources  
 - GA4 is the web-behaviour source
@@ -175,6 +175,28 @@ Status: draft, week 3
   12 SKUs were launched between 1 Nov 2020 and 31 Jan 2021; 8 of them have sold, on average 42.4 days after launch. Across the whole catalogue, 786 of 1,231 SKUs (63.9%) have sold and 445 never have.
 - Answer to above question on fct_order_items (from Mart):
   From 1 Nov 2020 to 31 Jan 2021, Apparel carried 67.7% of margin (109,114 of 161,202) at a 51.9% rate. Stationery sold 24.3% of units but brought 4.9% of margin, at 44.3%. Overall margin rate was 49.5%.
+- Answer to above question on fct_sessions (from Mart):
+  From 1 Nov 2020 to 31 Jan 2021, 77,020 of 360,129 sessions viewed an item; in order, 19.7% of those added to cart, 39.3% began checkout and 47.8% purchased. View to cart is the biggest drop on every device (desktop 19.6%, mobile 19.9%, tablet 18.9%). The in-order funnel captures 2,848 of 4,848 purchase sessions; 1,850 others reached checkout with no add-to-cart event, so view to cart is a lower bound (at most about 26%).
+- Retention
+  Among customers first ordering between 2 Nov 2020 and 31 Jan 2021, 2.6% ordered again in the following week and 1.3% in week 4; at least 200 of the 577 repeat buyers reordered within their first week. Among 259,174 new visitors, 3.8% returned in the following week and 0.9% in week 4. Thirteen weeks is too short to read repeat purchase beyond about week 7.
+- Revenue
+  From 1 Nov 2020 to 31 Jan 2021, Fennmark took 5,006 non-cancelled orders worth 321,733 USD net, peaking in the week of 7 December (939 orders, 57,990 USD). Web brought 81.8% of revenue, app 11.0% and phone 7.1%. GA4 missed 1,219 of 5,431 orders (22.4%): every app and phone order, and no web order.
+- Returns
+  For orders placed 1 Nov 2020 to 31 Jan 2021, 4.9% of delivered lines were returned (650 of 13,374): Apparel highest at 5.8%, the other main categories between 3.7% and 4.6%. By order, 7.6% of delivered orders had a return request (373 of 4,894), with no channel difference (7.2% to 7.8%). Top reasons were changed mind (40.5%) and wrong size (29.2%); 83.9% of requests were accepted.
+- NPS
+  For orders placed 1 Nov 2020 to 31 Jan 2021, NPS was 6.0 on 1,947 responses. It moves with shipping time: +21.3 when the carrier took 5 days or less, −23.2 when it took longer. By delivery month it was 1.1 (Nov), 7.0 (Dec), 9.1 (Jan) and −6.6 (Feb, 61 responses); December’s slower deliveries came from warehouse time, which did not lower its score.
+
+| Mart (Week 8) | Question | Answer (orders placed 1 Nov 2020 to 31 Jan 2021) |
+| --- | --- | --- |
+| fct_orders | What were net revenue and order count per week by channel, and what share of orders did GA4 miss? | 5,006 non-cancelled orders, 321,733 USD net; peak week 7 Dec (939 orders); web 81.8% of revenue, app 11.0%, phone 7.1%; GA4 missed 1,219 of 5,431 orders (22.4%), all app and phone |
+| fct_order_items | Which products and categories carry the margin, and which sell volume at low margin? | Apparel carries 67.7% of margin at 51.9%; Stationery is 24.3% of units and 4.9% of margin at 44.3%; overall rate 49.5% |
+| dim_customers | What share of customers in the period are repeat buyers, and how many consented to email? | 577 of 4,168 buyers (13.8%) are repeat buyers; 2,544 of 4,651 customers consented (54.7%), 1,402 declined, 705 unknown |
+| dim_products | How many products were launched in the window, and how long until first sale? | 12 SKUs launched in the window, 8 sold, 42.4 days to first sale on average; 786 of 1,231 SKUs have sold |
+| fct_sessions | What is the view-to-purchase funnel by device category, and where is the biggest drop? | 77,020 sessions viewed an item; then 19.7% to cart, 39.3% to checkout, 47.8% to purchase; biggest drop is view to cart on every device; lower bound, since 1,850 purchase sessions have no add-to-cart event |
+| fct_returns | What is the return rate by product category and channel, and what are the top reasons? | 4.9% of delivered lines returned (Apparel 5.8%); 7.6% of delivered orders, no channel difference; top reasons changed mind (40.5%) and wrong size (29.2%); 83.9% accepted |
+| fct_nps | What is NPS by delivery month, and does it move with shipping time? | NPS 6.0 on 1,947 responses; +21.3 at 5 days or less in transit, −23.2 above; Nov 1.1, Dec 7.0, Jan 9.1, no December dip |
+| Reconciliation (Week 7) | For the period, how many orders are matched, GA4-only and backend-only, and what is the revenue gap on matched orders? | 4,212 matched, 239 + 456 + 450 GA4-only, 1,246 backend-only; gross delta 0, net gap 4,588.13 |
+| Cohorts (agg models) | Of a weekly cohort, how many order again or come back n weeks later? | 2.6% of a cohort reorder in the following week, 1.3% in week 4; 3.8% of 259,174 new visitors return in the following week |
 
 ## 10. Out of scope
 - Inventory and stock levels

@@ -84,4 +84,84 @@ models:
                 values: ['promoter', 'passive', 'detractor']
       - name: nps_points
         description: 100 promoter, 0 passive, -100 detractor; NULL when unanswered.
+      - name: days_in_transit
+        description: Whole days from shipped to delivered (the carrier leg). NPS steps down above 5 (m10c).
 
+  - name: fct_sessions
+    description: >
+      What is the view-to-purchase funnel by device category, and where is the biggest drop?
+      One row per GA4 session, from int_ga4__sessions, with the customer the cookie belongs to
+      where there is one. has_* flags are each step on its own (open funnel); funnel_depth
+      counts steps reached in order (closed funnel) and is what a funnel chart reads.
+      first_touch_* is user-level acquisition, not session attribution. Partitioned by session_date.
+    data_tests:
+      - dbt_utils.equal_rowcount:
+          arguments:
+            compare_model: ref('int_ga4__sessions')
+    columns:
+      - name: session_key
+        data_tests: [unique, not_null]
+      - name: customer_id
+        description: NULL when the cookie never became a customer (most sessions).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: session_date
+        data_tests: [not_null]
+      - name: device_category
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['desktop', 'mobile', 'tablet']
+      - name: funnel_depth
+        description: >
+          0 no item viewed, 1 viewed, 2 added to cart, 3 began checkout, 4 purchased;
+          each step requires the ones before it.
+          38% of purchase sessions have no add_to_cart event, so depth understates progress past the view step (m11c).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4]
+                quote: false
+      - name: is_abandoned_checkout
+        description: begin_checkout without a purchase in the same session (abandonment proxy).
+
+  - name: agg_repeat_purchase_cohorts
+    description: >
+      Of the customers who first ordered in week W, how many ordered again n weeks later?
+      One row per cohort_week x weeks_since_first_order. Counts only; the rate is
+      active_customers / cohort_size. Compare only cells where is_complete_period.
+      A missing row means zero active customers.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "active_customers <= cohort_size"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "active_customers = cohort_size"
+          config:
+            where: "weeks_since_first_order = 0"
+    columns:
+      - name: cohort_period_id
+        data_tests: [unique, not_null]
+
+  - name: agg_retention_cohorts
+    description: >
+      Of the visitors whose first-ever session was in week W, how many came back n weeks later?
+      One row per cohort_week x weeks_since_first_session, new visitors only. A visitor is a
+      cookie, not a person. Compare only cells where is_complete_period.
+    data_tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "active_visitors <= cohort_size"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "active_visitors = cohort_size"
+          config:
+            where: "weeks_since_first_session = 0"
+    columns:
+      - name: cohort_period_id
+        data_tests: [unique, not_null]

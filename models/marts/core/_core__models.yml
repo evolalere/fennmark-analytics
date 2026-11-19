@@ -60,6 +60,8 @@ models:
                 values: ['placed', 'paid', 'shipped', 'delivered', 'cancelled', 'returned', 'refunded']
       - name: days_to_deliver
         description: Whole days from placed_at to delivered_at; NULL if not delivered.
+      - name: days_in_transit
+        description: Whole days from shipped_at to delivered_at (the carrier leg); NULL if not delivered.
       - name: reconciliation_category
         description: matched (GA4 saw the purchase) or backend_only (it did not).
         data_tests:

@@ -184,12 +184,51 @@ and `dbt_dev_intermediate`. Full build 2026-11-15: 1 seed, 18 models (14 staging
 | m1 | Orders; in period; in stub week; EUR; discounted | 5,458; 5,431; n/a; ~20; ≥628 | 5,458; 5,431; 0; 20; 628 | No orders on 1 Nov, so no stub order week; discounts only on GA4-seeded orders |
 | m2 | fct_orders shape | 5,458; ≤4,651 customers; 5,431 in period; 428 cancelled; 4,918 delivered; 313 returned; 456 with refund; 5 refunded while shipped | 5,458; 4,491; 5,431; 428; 4,918; 313; 456; 5; max 16 orders per customer | 160 customers have no order (m2b); 1.8 MiB per build |
 | m2b | Customers with no order; without cookie; cookie has a GA4-only purchase | 160; 0; ~160 | 160; 0; 160 | All 160 are GA4 purchasers whose only purchase got no backend order |
+| m3 | Orders; not cancelled; net revenue USD; refunded USD; GA4 missed; share | 5,431; >5,003; n/a; n/a; 1,219; 22.45% | 5,431; 5,006; 321,733.25; 23,236.36; 1,219; 22.45% | 425 cancelled in period; refunds 7.2% of net revenue, reported beside it |
+| m4 | Orders and net revenue by week and channel | 39 rows; sums to m3 | 38 rows; web 4,212 / 263,229.25; app 743 / 35,521.00; phone 476 / 22,983.00; peak week 2020-12-07 (939 / 57,989.82) | No web orders in week of 2 Nov; GA4 missed 100% of app and phone, 0% of web |
 | m5 | Orders with lines; lines = gross; lines ≠ gross; negative-margin lines | 5,458; n/a; several hundred (≤833 among matched); n/a | 5,458; 4,677; 781; 26 | 14.3% of orders: GA4 header vs line revenue gap carried through; revenue from fct_orders, margin from fct_order_items |
 | m6 | Margin by category (period, not cancelled, USD) | 7 categories, no Other; rates ~0.30 to 0.60 | Apparel 210,261 / 109,114 / 51.9%; Drinkware 43,727 / 19,683 / 45.0%; Bags 27,490 / 12,340 / 44.9%; Accessories 19,797 / 9,054 / 45.7%; Stationery 17,705 / 7,835 / 44.3%; Lifestyle 4,121 / 1,741 / 42.2%; Gift Cards 2,800 / 1,435 / 51.2% | Total 325,901 / 161,202 / 49.5%; Apparel 67.7% of margin; Stationery 24.3% of units, 4.9% of margin |
 | m7 | Customers; buyers in period; repeat buyers; share; consented / declined / unknown; linked to GA4 | 4,651; <4,491; n/a; n/a; unknown ~700; n/a | 4,651; 4,168; 577; 13.84%; 2,544 / 1,402 / 705; 4,514 | 323 customers have only cancelled or February orders; 137 customers have no cookie |
 | m8 | SKUs; sold; launched in period; launched and sold; avg days to first sale; min days | 1,231; n/a; small or 0; n/a; n/a; ≥0 | 1,231; 786; 12; 8; 42.4; 13 | 445 SKUs (36.1%) never sold; no sale before launch |
+| m9 | Return rate by category (lines) | 7 rows; returned lines ≤650 | Gift Cards 5 / 64 = 7.81%; Apparel 354 / 6,064 = 5.84%; Lifestyle 12 / 259 = 4.63%; Bags 40 / 918 = 4.36%; Stationery 91 / 2,218 = 4.10%; Accessories 65 / 1,612 = 4.03%; Drinkware 83 / 2,239 = 3.71% | 650 / 13,374 = 4.86% overall; Gift Cards base too small to rank |
+| m9 | Return rate by channel (orders) | requests ≤373; ~7.6% overall | app 52 / 670 = 7.76%; web 291 / 3,807 = 7.64%; phone 30 / 417 = 7.19% | 373 / 4,894 = 7.62%; no channel effect |
+| m9 | Return reasons (requests / accepted) | 4 rows; ≤373 / ≤313 | changed_mind 151 / 133; wrong_size 109 / 84; damaged 63 / 52; not_as_described 50 / 44 | 373 / 313; wrong_size has the lowest acceptance (77.1%) |
 | m9a | Returned lines; requests; accepted; whole-order; days from delivery | >373; 373; 313; ~150; 0 to 30 | 650; 373; 313; 161; 1 to 30 | 212 item returns + 161 whole-order returns expanded to 438 lines; 83.9% accepted |
+| m10 | NPS by delivery month (responses / NPS / avg days) | sums 4,918 and 1,947; December dip | Nov 362 / 1.1 / 6.2; Dec 1,095 / 7.0 / 7.5; Jan 429 / 9.1 / 6.6; Feb 61 / −6.6 / 7.4 | No December dip, contrary to the generator README; monthly gaps within sampling error |
+| m10 | NPS by delivery-time band | responses 496 / 957 / 494; falling with time | 16.9 / 11.3 / −15.4 | 32 points from fastest to slowest; the drop is past 8 days |
 | m10a | Surveys; responses; promoters / passives / detractors; NPS; days to deliver; band responses | 4,918; ~1,970; sum = responses; n/a; n/a; three usable bands | 4,918; 1,947 (39.6%); 722 / 619 / 606; 6.0; 2 to 12; 496 / 957 / 494 | Band edges at 5 and 8 days kept |
+| m10b | By delivery month: slow carrier share; NPS fast / slow carrier leg; avg days paid to shipped | fast ~+20, slow ~−20; December share not higher; December warehouse lag | Nov 29.6% / 20.0 / −43.9 / 1.9; Dec 33.4% / 21.4 / −21.6 / 2.9; Jan 36.6% / 22.4 / −14.0 / 2.0; Feb 70.5% / 22.2 / −18.6 / 2.2 | Pooled +21.3 (1,274) vs −23.2 (673). December lag is paid to shipped, which does not drive the score. Open: November slow group at −43.9 on 107 responses |
+| m10c | NPS by whole days in transit (responses / NPS) | sums to 1,947; step from ~+20 to ~−20 | 2: 310 / 15.2; 3: 332 / 28.0; 4: 320 / 16.9; 5: 312 / 25.0; 6: 320 / −24.7; 7: 353 / −21.8 | A step between 5 and 6 days, not a slope; no trend inside either group |
+| m11 | Closed funnel by device (viewed / cart / checkout / purchased) and open purchases | sessions 208,942 / 143,185 / 8,002; open purchases sum to 4,848 | desktop 44,819 / 8,780 / 3,425 / 1,606, open 2,749; mobile 30,501 / 6,072 / 2,404 / 1,180, open 1,995; tablet 1,700 / 321 / 130 / 62, open 104 | Biggest drop view to cart (19.7%); devices within ~2 points; 2,000 of 4,848 purchase sessions (41.3%) fall outside the closed funnel |
+| m11a | Device categories in int_ga4__sessions | desktop / mobile / tablet, sum 360,129 | 208,942 / 143,185 / 8,002; no NULL | Sets the accepted_values list for fct_sessions |
+| m11b | Sessions; of known customers; customers with sessions; with purchase; with identified purchase; abandoned checkouts | 360,129; n/a; 4,514; 4,848; 4,044; n/a | 360,129; 14,676 (4.1%); 4,514; 4,848; 4,044; 6,261 | Cookie join adds no rows; ~3.3 sessions per customer |
+| m11c | Purchase sessions by funnel depth | depth 4 = 2,848; rest sums to 2,000 | depth 0: 150 (147 with checkout, 22 first sessions); depth 1: 1,850 (all with checkout, none with cart, 644 first sessions); depth 4: 2,848 (1,114 first sessions) | Missing step is add_to_cart; first-session share similar to complete funnels, so not returning shoppers |
+| m12 | Repeat purchase by weeks since first order (complete weeks, zeros kept) | week 0 = 4,168 at 1.0; 13 cohorts falling to 1 | w1 103 / 4,043 = 2.55%; w2 1.93%; w3 1.68%; w4 1.26%; w5 1.16%; w6 1.02%; w7 0.61%; w8 0.68%; w9 0.50%; w10 0; w11 0.34%; w12 0 | Per-week, not cumulative; 377 customer-weeks in weeks 1 to 12, so ≥200 of 577 repeat buyers reordered in week 0; first cohort 55 customers |
+| m12 | Retention of new visitors by weeks since first session | week 0 at 1.0; 13 cohorts falling to 1 | 259,174 new visitors; w1 3.80%; w2 1.55%; w3 1.09%; w4 0.91%; w6 0.43%; w8 0.30%; w12 0.08% | Cohorts large enough to read throughout |
+
+Full build 2026-11-19: 1 seed, 27 models, 217 tests, PASS=245, WARN=0, 154 s.
+
+## Mart conventions (week 8)
+
+- **One question per mart.** Every description opens with its business question (domain_spec section 9).
+- **Naming.** `fct_` facts, `dim_` dimensions, `agg_` pre-aggregated cohorts. `marts/core` is the order
+  system; `marts/product` is behaviour, returns, NPS and cohorts.
+- **Tables** in `dbt_dev_marts`; `fct_sessions` is partitioned by `session_date`.
+- **No logic of their own.** Status, customer and reconciliation category are read from intermediate.
+- **Grain is stated and tested.** Every fact has a row-count test against the model that defines its
+  grain. `fct_returns` is one row per returned line; `return_line_number = 1` gives requests.
+- **Flags, not filters.** All orders are kept; `is_in_reporting_period`, `is_cancelled` and
+  `has_currency_mismatch` are applied in the query.
+- **Amounts and counts, never rates.** Rates are computed at query time from sums.
+- **Revenue from `fct_orders`, margin from `fct_order_items`.** Their totals differ by design
+  (lines differ from order gross on 781 orders).
+- **Cohort cells with no row are zeros.** Pooled cohort rates are computed over the full grid (m12).
+
+## Open after week 8
+
+- November's slow-carrier NPS is −43.9 on 107 responses, against about −20 in other months (m10b).
+- README limitations (week 14): every web order is matched and every app/phone order is missed;
+  Gift Cards carry a generated cost of goods; the funnel's view-to-cart rate is a lower bound.
 
 ## Source freshness
 

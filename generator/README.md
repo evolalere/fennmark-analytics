@@ -178,7 +178,8 @@ Expected outcome in week 7: matched orders reconcile exactly on gross once (2) i
 
 These are properties of the generated backend, not findings about any real business. They are listed so that the marts in weeks 6-8 can be checked against what was put in.
 
-- **NPS overall: +7** (4,195 surveys sent, 40% responded). The score is generated with shipping time and returns as drivers: orders delivered more than 5 days after shipping draw from a detractor-heavy band, and a return requested before the response shifts it further. The peak-season shipping lag (7-23 Dec) therefore pulls December NPS down; `fct_nps` should be able to show NPS by delivery-time bucket and by month, and the December dip is the expected answer.
+- **NPS overall: +7** (4,195 surveys sent, 40% responded). The score is generated with shipping time and returns as drivers: orders delivered more than 5 days after shipping draw from a detractor-heavy band, and a return requested before the response shifts it further. The score keys on the carrier leg (shipped to delivered over 5 days). The peak-season lag (7-23 Dec)
+sits in the warehouse step (paid to shipped), so it lengthens delivery without lowering December NPS: measured 7.0 for December deliveries against 1.1 for November and 9.1 for January (week 8, m10b).
 - **Lifecycle:** 346 cancelled (7.5%; 5% unpaid, the rest after payment), 4,195 delivered, ~2% stuck at shipped at window end.
 - **Returns:** 358 (8.5% of delivered), 85% accepted; reasons weighted by category (wrong_size for apparel, damaged for drinkware).
 - **Refunds:** 441, of which 4 are deliberately bad (refund on an order whose latest status is shipped, no return, no status event).
