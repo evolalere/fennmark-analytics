@@ -806,6 +806,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(HERE / "config.yml"))
     ap.add_argument("--no-load", action="store_true", help="write CSVs only, skip the BigQuery load")
+    ap.add_argument("--early-state", action="store_true",
+                    help="load raw as it looked before discounts were applied and before "
+                         "late status events landed (week 9); CSVs are unaffected")    
     args = ap.parse_args()
 
     cfg = load_config(Path(args.config))
@@ -838,9 +841,24 @@ def main() -> None:
         "returns": returns, "refunds": refunds, "nps_surveys": nps_surveys,
         "marketing_spend": marketing_spend, "experiment_assignments": experiment_assignments,
     }
-    write_csvs(frames, ga4_only_ids)
+    write_csvs(frames, ga4_only_ids)             # always the final data: the md5 check holds
+
     if not args.no_load:
-        load_raw(client, cfg["bigquery"]["dataset"], frames)
+        to_load = dict(frames)
+        if args.early_state:
+            # orders as first written: no discount yet
+            for name in ("orders_2020", "orders_2021"):
+                to_load[name] = frames[name].assign(discount_amount=0.0)
+            # status events that had not arrived yet: loaded a day or more after they happened
+            true_ts = events_true.set_index("event_id")["event_ts"]
+            lag = status_events["loaded_at"] - status_events["event_id"].map(true_ts)
+            is_late = lag >= pd.Timedelta(days=1)
+            to_load["order_status_events"] = status_events.loc[~is_late]
+            n_disc = sum(int((frames[n]["discount_amount"] > 0).sum())
+                         for n in ("orders_2020", "orders_2021"))
+            print(f"[early-state] discount zeroed on {n_disc:,} orders; "
+                  f"{int(is_late.sum()):,} late status events held back")
+        load_raw(client, cfg["bigquery"]["dataset"], to_load)
     
 
 
