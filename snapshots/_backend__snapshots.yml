@@ -1,0 +1,40 @@
+version: 2
+
+snapshots:
+  - name: snp_backend__orders
+    description: >
+      History of the raw orders table: one row per version of an order, with the period during
+      which the warehouse held that version. Raw orders are overwritten in place and carry no
+      updated_at, so this is the only record of what an order looked like before a change
+      (docs/decisions.md, week 9). dbt_valid_from and dbt_valid_to are the times dbt saw the
+      change, not the time it happened in the order system.
+    relation: source('backend', 'orders')
+    config:
+      schema: snapshots
+      unique_key: order_id
+      strategy: check
+      check_cols:
+        - customer_id
+        - channel
+        - payment_method
+        - currency
+        - gross_revenue
+        - discount_amount
+        - ship_country
+        - shipping_country
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [order_id, dbt_valid_from]
+    columns:
+      - name: order_id
+        description: Order id as in raw. Repeats once per version.
+        data_tests: [not_null]
+      - name: dbt_scd_id
+        description: Surrogate key of one version (order id + the time dbt recorded it).
+        data_tests: [unique, not_null]
+      - name: dbt_valid_from
+        description: When dbt first saw this version. The first snapshot run for the original rows.
+        data_tests: [not_null]
+      - name: dbt_valid_to
+        description: When dbt saw the next version. NULL for the current version.

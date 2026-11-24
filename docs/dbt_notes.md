@@ -259,6 +259,19 @@ Max `loaded_at` per table, run 2026-11-03:
 | order_status_events | 2021-03-06 16:09:35 | lifecycle tail |
 | returns | 2021-03-07 04:59:54 | lifecycle tail: up to 30 days after delivery |
 
+## Snapshot and incremental checks (week 9)
+
+| Check | What | Expected | Actual | Note |
+| --- | --- | --- | --- | --- |
+| r2 (early) | Raw orders; discounted; status events | 5,458; 0; 19,540 | 5,458; 0; 19,540 | 2,226 late events held back |
+| r3 (early) | Current status per order | differs from week 7 | delivered 4,157; shipped 498; refunded 403; cancelled 275; paid 56; placed 35; returned 31 | Sums to 5,455: 3 orders have no status event yet |
+| r3b (early) | History rows; illegal transitions | 19,540; > 0 | 19,540; 1,514 | 7.7% of transitions look illegal until late events land |
+| r2 (final) | Raw orders; discounted; status events | 5,458; 628; 21,766 | 5,458; 628; 21,766 | Raw restored |
+| r3 (final) | Current status per order | = week 7 i4 | delivered 4,605; refunded 451; cancelled 290; shipped 112 | Sums to 5,458 |
+| r3b (final) | History rows; illegal transitions | 21,766; 0 | 21,766; 0 | Late events landed; history correct with no code change |
+| r4 | Versions; orders; current; closed; runs with changes | 6,086; 5,458; 5,458; 628; 2 | 6,086; 5,458; 5,458; 628; 2 | Second run merged 1.3k rows (628 closed + 628 inserted) |
+| r5 | Orders changed; net as first seen; net now; discount applied later | 628; n/a; n/a; n/a | 628; 356,422.00; 351,833.87; 4,588.13 | All orders incl. cancelled and EUR; not the week 8 net revenue |
+
 ## How product_category_overrides was built
 
 Two passes against `fm_raw.products`:
