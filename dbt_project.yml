@@ -24,6 +24,9 @@ vars:
   reporting_start_date: '2020-11-01'    # business reporting period, by order date (domain_spec section 6)
   reporting_end_date: '2021-01-31'
 
+  ga4_lookback_days: 3          # an incremental run rebuilds the newest loaded day and the 3 before it
+  ga4_session_buffer_days: 1    # most days a session stretches past its first date (incremental_checks r8)
+    
 models:
   fennmark:
     staging:

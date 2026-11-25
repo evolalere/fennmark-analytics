@@ -4,10 +4,9 @@ models:
   - name: stg_ga4__events
     description: >
       One row per GA4 event in the project window; nothing dropped (4,295,584 rows,
-      equal to raw). Materialized as a table partitioned by event_date and clustered by
-      event_name, user_pseudo_id: the one staging model that is not a view, because a view
-      over 92 wildcard shards would re-scan the sample on every downstream query and test
-      (docs/dbt_notes.md). A full build reads ~2.05 GB. event_params are lifted to columns
+      equal to raw). Incremental (insert_overwrite by event_date, 3-day lookback), partitioned by event_date
+      and clustered by event_name, user_pseudo_id; a full refresh reads all 92 shards
+      (dbt_notes.md, week 9). A full build reads ~2.05 GB. event_params are lifted to columns
       with ga4_event_param; items are not here, see stg_ga4__purchase_items. Not staged:
       user_id (never populated), geo.city (42% '(not set)'), user_properties, privacy_info,
       user_ltv, app_info, event_dimensions.

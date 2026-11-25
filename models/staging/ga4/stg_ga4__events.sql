@@ -1,14 +1,22 @@
 {{
     config(
-        materialized='table',
+        materialized='incremental',
+        incremental_strategy='insert_overwrite',
         partition_by={'field': 'event_date', 'data_type': 'date'},
-        cluster_by=['event_name', 'user_pseudo_id']
+        cluster_by=['event_name', 'user_pseudo_id'],
+        on_schema_change='fail'
     )
 }}
 
 -- One row per GA4 event in the project window; nothing dropped.
--- The one staging model that is not a view: a view over 92 wildcard shards would
--- re-scan the sample on every downstream query and test (docs/dbt_notes.md).
+-- Incremental since week 9: a run re-reads the newest loaded day and the ga4_lookback_days
+-- before it, and replaces those date partitions whole (docs/dbt_notes.md, week 9).
+-- A full refresh reads all 92 shards.
+
+{%- set first_date = var('ga4_start_date') -%}
+{%- if is_incremental() -%}
+    {%- set first_date = lookback_start_date('event_date', var('ga4_lookback_days')) -%}
+{%- endif %}
 
 with
 
@@ -16,7 +24,7 @@ source as (
 
     select *
     from {{ source('ga4', 'events') }}
-    where _table_suffix between '{{ var("ga4_start_date") | replace("-", "") }}'
+    where _table_suffix between '{{ first_date | replace("-", "") }}'
                             and '{{ var("ga4_end_date") | replace("-", "") }}'
 
 ),

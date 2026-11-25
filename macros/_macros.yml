@@ -29,4 +29,17 @@ macros:
         description: The event_params key, e.g. 'ga_session_id', 'page_location'.
       - name: type
         type: string
-        description: Which value field to read - 'string' (default), 'int', 'float' or 'double'.
+        description: Which value field to read - 'string' (default), 'int', 'float' or 'double'.  
+        
+  - name: lookback_start_date
+    description: >
+      First date an incremental run reprocesses: max(date_column) in the model's own table
+      minus lookback_days, as a 'YYYY-MM-DD' string resolved at compile time. Used by
+      stg_ga4__events and int_ga4__sessions (docs/dbt_notes.md, week 9).
+    arguments:
+      - name: date_column
+        type: string
+        description: Partition column of the calling model (event_date or session_date).
+      - name: lookback_days
+        type: integer
+        description: How many days before the newest loaded date to rebuild.

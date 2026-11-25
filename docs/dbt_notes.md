@@ -271,6 +271,10 @@ Max `loaded_at` per table, run 2026-11-03:
 | r3b (final) | History rows; illegal transitions | 21,766; 0 | 21,766; 0 | Late events landed; history correct with no code change |
 | r4 | Versions; orders; current; closed; runs with changes | 6,086; 5,458; 5,458; 628; 2 | 6,086; 5,458; 5,458; 628; 2 | Second run merged 1.3k rows (628 closed + 628 inserted) |
 | r5 | Orders changed; net as first seen; net now; discount applied later | 628; n/a; n/a; n/a | 628; 356,422.00; 351,833.87; 4,588.13 | All orders incl. cancelled and EUR; not the week 8 net revenue |
+| r6 | Events in window; events in another day's shard | 4,295,584; 0 | 4,295,584; 0 | One shard holds exactly one event_date |
+| r7 (baseline) | Events; days; last date; purchase events; key fingerprint | 4,295,584; 92; 2021-01-31; 5,692; n/a | 4,295,584; 92; 2021-01-31; 5,692; 1318486233096451813 | Week 8 table, before the incremental change |
+| r7 (after run 1) | Events; days; last date; purchase events; key fingerprint | = baseline | 4,295,584; 92; 2021-01-31; 5,692; 1318486233096451813 | Incremental: SCRIPT, 93.2 MiB, 13 s (full build 2.05 GB) |
+| r7 (after run 2) | same | = baseline | 4,295,584; 92; 2021-01-31; 5,692; 1318486233096451813 | Idempotent: second run 93.2 MiB, table unchanged |
 
 ## How product_category_overrides was built
 
