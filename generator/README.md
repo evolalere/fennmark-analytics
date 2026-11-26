@@ -6,7 +6,10 @@
     pip install -r generator/requirements.txt
     python generator/generate.py            # extract (cached), build, write CSVs, load to fm_raw
     python generator/generate.py --no-load  # write CSVs only
+    python generator/generate.py --early-state  # week 9: load raw before discounts and before late status events
 
+`--early-state` changes the load only (discount zeroed on 628 orders, 2,226 late status events held
+back); the CSVs are identical. A normal run afterwards restores raw exactly.
 First run executes four aggregate queries against the GA4 public sample (a few GB scanned in total, once) and caches them as parquet in `generator/cache/`; later runs read the cache and never touch GA4. Runtime: ~1 minute with a warm cache. The load truncates and rebuilds every table in `fm_raw`. Two runs with the same seed produce byte-identical `generator/output/*.csv` (verified with md5sum). Seed, shares and lags live in `generator/config.yml`.
 
 ## Note

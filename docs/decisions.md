@@ -3,6 +3,22 @@
 A short log of design decisions that changed the project's direction. One entry per decision:
 context, decision, consequence. Newest at the top.
 
+## 2026-11-26 · Incremental only where volume justifies it; late data handled by a partition lookback and a full-refresh backstop (week 9)
+
+**Context.** Two GA4 models cost about 2.9 GB per full build, and both sources deliver data up to
+3 days late (status events: 765 / 723 / 738 at 1, 2 and 3 days; GA4 daily tables: up to 72 hours).
+
+**Decision.** stg_ga4__events and int_ga4__sessions are incremental with insert_overwrite by date
+and a 3-day lookback resolved at compile time; sessions add a 5-day buffer for sessions that span
+dates. Backend models stay views and tables. Raw orders is snapshotted with the check strategy,
+because it has no updated_at.
+
+**Consequence.** The two models process 109 MiB per run. Data later than 3 days is not repaired
+until a full refresh, and no test detects it. The 2026-10-27 entry said week 9's lookback
+re-derives status once late events land; what does it is that the status models are rebuilt from
+all events on every run. Measuring the build showed the larger cost is elsewhere: 29.10 GiB, most
+of it tests on two views over the raw sample (week 10 issue).
+
 ## 2026-11-19 · Marts keep every order and state their revenue rule (week 8)
 
 **Context.** 27 backend-only orders fall after the reporting period; 428 orders were cancelled; 20 are

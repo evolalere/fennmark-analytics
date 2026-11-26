@@ -278,6 +278,45 @@ Max `loaded_at` per table, run 2026-11-03:
 | r8 | Sessions by days spanned past their first date | 359,284 at 0; 845 at 1 | 359,284 at 0; 843 at 1; 1 at 2; 1 at 5 | Buffer set to 5, not 1; the 845 from week 7 counted all sessions on more than one date |
 | r9 (baseline) | Sessions; distinct; events; with purchase; last date; row fingerprint | 360,129; 360,129; 4,295,584; 4,848; 2021-01-31; n/a | 360,129; 360,129; 4,295,584; 4,848; 2021-01-31; 1712534599991345720 | Week 8 table, before the incremental change |
 | r9 (after run) | same | = baseline | 360,129; 360,129; 4,295,584; 4,848; 2021-01-31; 1712534599991345720 | Incremental: SCRIPT, 15.9 MiB, 13 s (full build 904.4 MiB); buffer 5 |
+| Exp 1, as of 24 Jan | r7: events; days; last date; purchases · r9: sessions; with purchase | 85 days; last date 2021-01-24 | 4,022,077; 85; 2021-01-24; 5,349 · 333,787; 4,537 | Full refresh with ga4_end_date 2021-01-24: 1.8 GiB + 847.3 MiB |
+| Exp 1, after catch-up | r7 and r9 | = baselines | 4,295,584; 92; 5,692; 1318486233096451813 · 360,129; 4,848; 1712534599991345720 | Equal to a full build; 204.4 MiB + 23.0 MiB |
+| Exp 2, late rows missing | Rows removed (30 Jan purchases) · r7: events; purchases · r9: with purchase | r7 short by the rows removed | 31 · 4,295,553; 5,661 · 4,820 | 31 events in 28 sessions; session count unchanged at 360,129 |
+| Exp 2, after next run | r7 and r9 | = baselines | 4,295,584; 5,692; 1318486233096451813 · 360,129; 4,848; 1712534599991345720 | Repaired by the lookback; 93.2 MiB + 15.9 MiB |
+| Exp 3, after incremental run | Rows removed (15 Jan purchases) · r7: events; purchases · r9 | r7 still short; r9 = baseline | 47 · 4,295,537; 5,645 · baseline | Not repaired: outside the lookback. Events and sessions disagree; no test fails |
+| Exp 3, after full refresh | r7 and r9 | = baselines | 4,295,584; 5,692; 1318486233096451813 · (r9 confirmed in C7) | Only a full refresh repairs it |
+
+## Snapshot and incremental strategy (week 9)
+
+- **What is incremental, and why only that.** stg_ga4__events and int_ga4__sessions: 2.05 GB and
+  904.4 MiB per full build. Every backend model is a view or a table of a few MiB; rebuilding in
+  full is the cheapest way to be right about late data, so they stay as they are.
+- **Strategy.** insert_overwrite by date partition, no unique_key. A run replaces whole days:
+  idempotent, and rows that vanish from the source vanish here. Rejected: merge (scans the key,
+  never deletes); microbatch (batches follow today's clock, the sample ends 2021-01-31).
+- **Lookback: 3 days.** Backend status events arrive 0 to 3 days late (r1: 19,540 / 765 / 723 /
+  738); GA4 updates a daily table for up to 72 hours. The start date is resolved at compile time
+  (lookback_start_date) so BigQuery prunes shards and partitions.
+- **Session buffer: 5 days.** One session spans 5 dates past its first, one spans 2, 843 span 1
+  (r8). Sessions are rebuilt from newest date minus lookback minus buffer (9 partitions); events
+  are read from one buffer earlier (14 days). Guard: unique on session_key.
+- **Cost.** Events 93.2 MiB per run (was 2.05 GB); sessions 15.9 MiB (was 904.4 MiB). Measured over
+  the whole build (INFORMATION_SCHEMA.JOBS): 29.10 GiB at PASS=252, against 31.52 GiB at PASS=245
+  in week 8, a saving of 2.42 GiB (7.7%). Elapsed time did not improve (162 s against 154 s).
+  The build is dominated by tests on two views over the raw GA4 sample: each test on
+  stg_ga4__purchase_items or stg_ga4__purchases scans about 1.34 GiB, and the top 15 nodes
+  account for 20.8 GiB. Earlier notes that put a full build at "about 5 GB" were an estimate.
+- **Tested (r7, r9 fingerprints against a full refresh).** A week of new days: equal, for 204.4 MiB
+  + 23.0 MiB. 31 late rows inside the lookback: 28 sessions under-reported for one run, repaired
+  by the next. 47 late rows outside it: not repaired, events and sessions disagree, no test fails,
+  until --full-refresh.
+- **Backstop.** A scheduled full refresh of the two models (about 2.9 GB). Not automated in this
+  project.
+- **Snapshot.** snp_backend__orders, check strategy on eight columns because raw orders has no
+  updated_at. Validity dates are snapshot-run times. 6,086 versions of 5,458 orders after the
+  week 9 exercise; 628 orders changed, 4,588.13 of discount applied after first sight.
+- **Late status events.** With the 2,226 late events held back, the history showed 1,514 illegal
+  transitions of 19,540, 122 orders at placed, paid or returned, and 3 orders with no status at
+  all (r3, r3b); after they landed, 0 of 21,766. Transition tests must allow for this.
 
 ## How product_category_overrides was built
 
