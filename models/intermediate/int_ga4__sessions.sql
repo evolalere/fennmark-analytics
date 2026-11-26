@@ -1,15 +1,24 @@
 {{
     config(
-        materialized='table',
+        materialized='incremental',
+        incremental_strategy='insert_overwrite',
         partition_by={'field': 'session_date', 'data_type': 'date'},
-        cluster_by=['user_pseudo_id']
+        on_schema_change='fail'
     )
 }}
 
--- One row per GA4 session (user_pseudo_id + ga_session_id).
 -- A session is defined by its events, not by its session_start event: 5,272 sessions
--- have none (360,129 keys vs 354,970 session_start events, docs/dbt_notes.md week 7 i1).
--- A table, like stg_ga4__events: it aggregates 4.3M rows and every product mart reads it.
+-- have none (docs/dbt_notes.md week 7, i2).
+-- Incremental since week 9: a run rebuilds the session_date partitions from window_start
+-- on. window_start is the newest loaded session date minus the lookback and the session
+-- buffer; events are read from one buffer earlier still, so that a session which started
+-- before window_start and ran past midnight is seen whole and can be left out
+-- (docs/dbt_notes.md, week 9).
+
+{%- if is_incremental() -%}
+    {%- set window_start = lookback_start_date(
+            'session_date', var('ga4_lookback_days') + var('ga4_session_buffer_days')) -%}
+{%- endif %}
 
 with
 
@@ -20,6 +29,10 @@ events as (
     -- guard only: no event in the sample lacks a session id (i1), but a null would
     -- still hash to a session_key and glue a user's orphan events into one fake session
     where ga_session_id is not null
+    {% if is_incremental() %}
+      and event_date >= date_sub(date '{{ window_start }}',
+                                 interval {{ var('ga4_session_buffer_days') }} day)
+    {% endif %}
 
 ),
 
@@ -76,6 +89,10 @@ final as (
         timestamp_diff(session_end_at, session_start_at, second) as session_duration_seconds,
         ga_session_number = 1                                    as is_first_session
     from aggregated
+    {% if is_incremental() %}
+    -- sessions that started before window_start were read only so they could be recognised
+    where session_date >= date '{{ window_start }}'
+    {% endif %}
 
 )
 

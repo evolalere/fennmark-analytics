@@ -25,7 +25,7 @@ vars:
   reporting_end_date: '2021-01-31'
 
   ga4_lookback_days: 3          # an incremental run rebuilds the newest loaded day and the 3 before it
-  ga4_session_buffer_days: 1    # most days a session stretches past its first date (incremental_checks r8)
+  ga4_session_buffer_days: 5    # longest span of one session, in days past its first date (incremental_checks r8)
     
 models:
   fennmark:

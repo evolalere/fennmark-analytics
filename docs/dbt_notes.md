@@ -275,6 +275,9 @@ Max `loaded_at` per table, run 2026-11-03:
 | r7 (baseline) | Events; days; last date; purchase events; key fingerprint | 4,295,584; 92; 2021-01-31; 5,692; n/a | 4,295,584; 92; 2021-01-31; 5,692; 1318486233096451813 | Week 8 table, before the incremental change |
 | r7 (after run 1) | Events; days; last date; purchase events; key fingerprint | = baseline | 4,295,584; 92; 2021-01-31; 5,692; 1318486233096451813 | Incremental: SCRIPT, 93.2 MiB, 13 s (full build 2.05 GB) |
 | r7 (after run 2) | same | = baseline | 4,295,584; 92; 2021-01-31; 5,692; 1318486233096451813 | Idempotent: second run 93.2 MiB, table unchanged |
+| r8 | Sessions by days spanned past their first date | 359,284 at 0; 845 at 1 | 359,284 at 0; 843 at 1; 1 at 2; 1 at 5 | Buffer set to 5, not 1; the 845 from week 7 counted all sessions on more than one date |
+| r9 (baseline) | Sessions; distinct; events; with purchase; last date; row fingerprint | 360,129; 360,129; 4,295,584; 4,848; 2021-01-31; n/a | 360,129; 360,129; 4,295,584; 4,848; 2021-01-31; 1712534599991345720 | Week 8 table, before the incremental change |
+| r9 (after run) | same | = baseline | 360,129; 360,129; 4,295,584; 4,848; 2021-01-31; 1712534599991345720 | Incremental: SCRIPT, 15.9 MiB, 13 s (full build 904.4 MiB); buffer 5 |
 
 ## How product_category_overrides was built
 

@@ -5,7 +5,9 @@ models:
     description: >
       One row per GA4 session (user_pseudo_id + ga_session_id), built from every event of the
       session, not from session_start. No event in the sample lacks a ga_session_id (i1); the
-      filter in the model is a guard. Table, partitioned by session_date.
+      filter in the model is a guard. 
+      Incremental (insert_overwrite by session_date); rebuilds from the newest session date
+      minus lookback and session buffer (dbt_notes.md, week 9).
     data_tests:
       - dbt_utils.expression_is_true:
           arguments:
